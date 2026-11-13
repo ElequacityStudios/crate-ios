@@ -11,7 +11,8 @@ import Observation
 /// shows the kernel from its first line; ConsoleBridge carries it to the
 /// screen. The display is a virtio GPU the guest draws on in software (2D), with
 /// a virtio keyboard and tablet; DisplayBridge carries frames out and input in.
-/// No network yet (NoNetwork.c).
+/// The network is user-mode, through libslirp (Scripts/build-slirp.sh): the
+/// guest gets 10.0.2.15 by DHCP and reaches the internet through crate.
 @MainActor @Observable
 final class MachineRunner {
     enum Phase: Equatable {
@@ -187,6 +188,10 @@ final class MachineRunner {
             { check(crate_config_set_initrd(config, settings.initrd), "the initrd") },
             { check(crate_config_set_cmdline(config, settings.commandLine), "the kernel command line") },
             { check(crate_config_add_disk(config, settings.disk, 0), "the disk") },
+            {
+                var network: UInt32 = 0
+                return check(crate_config_add_network(config, &network), "the network")
+            },
             {
                 var callbacks = console.callbacks
                 var index: UInt32 = 0

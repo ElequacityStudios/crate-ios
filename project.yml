@@ -73,6 +73,12 @@ targets:
       # crate, the VM engine, built by Scripts/build-crate.sh; `import CrateEngine`.
       - framework: Frameworks/Crate.xcframework
         embed: false
+      # libslirp and GLib, crate's user-mode networking, built by
+      # Scripts/build-slirp.sh: dynamic frameworks the app embeds.
+      - framework: Frameworks/Slirp.xcframework
+        embed: true
+      - framework: Frameworks/GLib.xcframework
+        embed: true
       - package: SwiftTerm
     entitlements:
       path: Resources/Crate.entitlements

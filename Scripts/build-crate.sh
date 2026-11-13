@@ -8,8 +8,7 @@
 #     CRATE_DIR=/path/to/crate ./Scripts/build-crate.sh
 #
 # Needs Rust with the aarch64-apple-ios and aarch64-apple-ios-sim targets. crate
-# leaves libslirp to the app; until crate-ios has networking, NoNetwork.c stands
-# in for it.
+# leaves libslirp to the app: Scripts/build-slirp.sh builds it.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
