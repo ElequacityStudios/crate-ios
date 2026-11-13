@@ -20,7 +20,7 @@ enum LogExport {
             "jit method: \(UserDefaults.standard.string(forKey: SettingsKey.jitMethod) ?? JITMethod.standard.rawValue)",
             "",
         ]
-        try? (lines.joined(separator: "\n") + "\n" + JITLog.contents())
+        try? (lines.joined(separator: "\n") + "\n" + AppLog.contents())
             .write(to: url, atomically: true, encoding: .utf8)
         return url
     }

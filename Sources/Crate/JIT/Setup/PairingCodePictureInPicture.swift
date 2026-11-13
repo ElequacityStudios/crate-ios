@@ -108,7 +108,7 @@ final class PairingCodePictureInPicture: NSObject {
         do {
             try engine.start()
         } catch {
-            JITLog.write("jit: pairing: couldn't play silence to stay running (\(error.localizedDescription))")
+            AppLog.write("jit: pairing: couldn't play silence to stay running (\(error.localizedDescription))")
             return
         }
         player.scheduleBuffer(buffer, at: nil, options: .loops)
@@ -182,16 +182,16 @@ final class PairingCodePictureInPicture: NSObject {
 /// Logged, so a pairing that stopped can be traced to Picture in Picture.
 extension PairingCodePictureInPicture: AVPictureInPictureControllerDelegate {
     nonisolated func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
-        JITLog.write("jit: pairing: Picture in Picture started")
+        AppLog.write("jit: pairing: Picture in Picture started")
     }
 
     nonisolated func pictureInPictureController(_ controller: AVPictureInPictureController,
                                                 failedToStartPictureInPictureWithError error: Error) {
-        JITLog.write("jit: pairing: Picture in Picture didn't start (\(error.localizedDescription))")
+        AppLog.write("jit: pairing: Picture in Picture didn't start (\(error.localizedDescription))")
     }
 
     nonisolated func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        JITLog.write("jit: pairing: Picture in Picture stopped")
+        AppLog.write("jit: pairing: Picture in Picture stopped")
     }
 }
 

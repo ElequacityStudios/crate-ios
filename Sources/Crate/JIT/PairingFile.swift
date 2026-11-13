@@ -32,7 +32,7 @@ enum PairingFile {
     static func store(_ data: Data) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        JITLog.write("jit: paired this iPhone (\(data.count)-byte record)")
+        AppLog.write("jit: paired this iPhone (\(data.count)-byte record)")
     }
 
     /// Deletes crate's copy. iOS keeps its side of a pairing made on this
@@ -40,7 +40,7 @@ enum PairingFile {
     /// can't use it.
     static func forget() {
         try? FileManager.default.removeItem(at: url)
-        JITLog.write("jit: forgot the pairing")
+        AppLog.write("jit: forgot the pairing")
     }
 
     /// Copies a file the person picked in Files over the stored one.
@@ -53,6 +53,6 @@ enum PairingFile {
         }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        JITLog.write("jit: imported a pairing file (\(data.count) bytes)")
+        AppLog.write("jit: imported a pairing file (\(data.count) bytes)")
     }
 }

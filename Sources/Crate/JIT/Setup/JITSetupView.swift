@@ -47,7 +47,7 @@ struct JITSetupView: View {
             }
             .task { await setup.checkTunnel() }
             .onChange(of: scenePhase) {
-                JITLog.write("jit: setup: crate is \(scenePhase == .active ? "in front" : scenePhase == .background ? "in the background" : "inactive")")
+                AppLog.write("jit: setup: crate is \(scenePhase == .active ? "in front" : scenePhase == .background ? "in the background" : "inactive")")
                 // Back from LocalDevVPN or Settings.
                 if scenePhase == .active {
                     setup.returnedToFront()

@@ -126,7 +126,7 @@ final class OnDevicePairing: NSObject, @unchecked Sendable {
         // Still advertised until the pairing ends (start() stops it): Settings
         // watches the service, and calls the pairing interrupted if crate
         // disappears while it asks for the passcode.
-        JITLog.write("jit: pairing: Settings opened a connection")
+        AppLog.write("jit: pairing: Settings opened a connection")
 
         // iOS drives the pairing from here and idevice answers. The callback
         // comes when iOS asks for the code: crate's own, shown already.
@@ -139,7 +139,7 @@ final class OnDevicePairing: NSObject, @unchecked Sendable {
         }
         let result = consume(pairable_host_accept_fd(host, connection, callback, context.toOpaque(),
                                                      nil, &pairingFile))
-        JITLog.write("jit: pairing: idevice returned \(result ?? "success")")
+        AppLog.write("jit: pairing: idevice returned \(result ?? "success")")
         if isCancelled { return .failed("Pairing was cancelled.") }
         if let message = result {
             return .failed("Pairing didn't finish (\(message)). Try again, and type the code in Settings.")

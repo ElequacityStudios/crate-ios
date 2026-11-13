@@ -114,11 +114,11 @@ final class JITSession {
     nonisolated private static func claim(sizeMB: Int) -> (State, crate_code_region?) {
         var flags: UInt32 = 0
         guard crate_jit_cs_flags(&flags) else {
-            JITLog.write("jit: csops failed, assuming no JIT")
+            AppLog.write("jit: csops failed, assuming no JIT")
             return (.off(.noDebugger), nil)
         }
         let traced = crate_jit_traced()
-        JITLog.write("jit: flags=\(String(flags, radix: 16)) debugged=\(flags & csDebugged != 0) "
+        AppLog.write("jit: flags=\(String(flags, radix: 16)) debugged=\(flags & csDebugged != 0) "
                      + "eligible=\(flags & csGetTaskAllow != 0) traced=\(traced)")
         guard flags & csDebugged != 0 else {
             return (.off(flags & csGetTaskAllow != 0 ? .noDebugger : .notEligible), nil)
@@ -132,7 +132,7 @@ final class JITSession {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: claimingKey) {
             defaults.set(false, forKey: claimingKey)
-            JITLog.write("jit: the last launch died claiming its code region; not trying again")
+            AppLog.write("jit: the last launch died claiming its code region; not trying again")
             return (.failed("crate closed while claiming its code region last time, so this launch skipped it. Turn JIT on again to retry."), nil)
         }
         defaults.set(true, forKey: claimingKey)
@@ -146,12 +146,14 @@ final class JITSession {
         var region = crate_code_region()
         if crate_code_region_map(size, needsAuthorization, &region) != CRATE_REGION_OK {
             let errorText = String(cString: strerror(errno))
+            AppLog.write("jit: no room for \(sizeMB) MB below 64 GiB: iOS first offered "
+                         + "\(String(crate_code_region_first_offer, radix: 16)), largest gap \(crate_code_region_largest_gap >> 20) MiB")
             return failure(needsAuthorization
                 ? "iOS wouldn't map \(sizeMB) MB for code low enough for the debugger to authorize (\(errorText)). Try a smaller code region."
                 : "iOS wouldn't map \(sizeMB) MB for code (\(errorText)). Try a smaller code region.")
         }
         // Logged before the step that can kill the process, so a crash there has an address.
-        JITLog.write("jit: claiming \(sizeMB) MB at \(String(UInt(bitPattern: region.executable), radix: 16)) "
+        AppLog.write("jit: claiming \(sizeMB) MB at \(String(UInt(bitPattern: region.executable), radix: 16)) "
                      + "(iOS first offered \(String(crate_code_region_first_offer, radix: 16))), "
                      + "authorized=\(needsAuthorization)")
         let status = crate_code_region_finish(&region, needsAuthorization)
@@ -170,14 +172,14 @@ final class JITSession {
         guard crate_code_region_test(&region) else {
             return failure("Code written into the region didn't run correctly.")
         }
-        JITLog.write("jit: on, \(sizeMB) MB claimed and tested in \(String(format: "%.2f", seconds)) s, "
+        AppLog.write("jit: on, \(sizeMB) MB claimed and tested in \(String(format: "%.2f", seconds)) s, "
                      + "code at \(String(UInt(bitPattern: region.executable), radix: 16)), "
                      + "written at \(String(UInt(bitPattern: region.writable), radix: 16))")
         return (.on(regionMB: sizeMB), region)
     }
 
     nonisolated private static func failure(_ message: String) -> (State, crate_code_region?) {
-        JITLog.write("jit: failed: \(message)")
+        AppLog.write("jit: failed: \(message)")
         return (.failed(message), nil)
     }
 
@@ -195,35 +197,5 @@ final class JITSession {
         #else
         false
         #endif
-    }
-}
-
-/// Lines about JIT, kept in `Library/Caches/crate.log` (a phone's unified log
-/// can't be read from a Mac, a file can) and shared by Settings > Export Logs.
-enum JITLog {
-    static let url = URL.cachesDirectory.appendingPathComponent("crate.log")
-    private static let lock = NSLock()
-    private static let started = Date.now
-
-    /// Starts this launch's log afresh.
-    static func begin() {
-        lock.withLock {
-            try? Data().write(to: url)
-        }
-        write("crate launched, iOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
-    }
-
-    static func write(_ line: String) {
-        let stamp = String(format: "[%7.3f] ", Date.now.timeIntervalSince(started))
-        lock.withLock {
-            guard let handle = try? FileHandle(forWritingTo: url) else { return }
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: Data((stamp + line + "\n").utf8))
-        }
-    }
-
-    static func contents() -> String {
-        lock.withLock { (try? String(contentsOf: url, encoding: .utf8)) ?? "" }
     }
 }

@@ -7,6 +7,13 @@ options:
   groupSortPosition: top
   generateEmptyDirectories: false
 
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    # Pinned: 1.19.0 and later add a build-tool plugin xcodebuild can't stage
+    # for an iOS destination, and main has moved to Swift 6 mode.
+    exactVersion: 1.18.0
+
 targets:
   Crate:
     type: application
@@ -63,6 +70,10 @@ targets:
       # idevice, built from source by Scripts/build-idevice.sh: pairing on the iPhone.
       - framework: Frameworks/IDevice.xcframework
         embed: false
+      # crate, the VM engine, built by Scripts/build-crate.sh; `import CrateEngine`.
+      - framework: Frameworks/Crate.xcframework
+        embed: false
+      - package: SwiftTerm
     entitlements:
       path: Resources/Crate.entitlements
       properties:

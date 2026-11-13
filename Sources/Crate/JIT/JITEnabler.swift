@@ -11,7 +11,7 @@ extension JITSession {
         enablerError = nil
         isTurningOn = true
         defer { isTurningOn = false }
-        JITLog.write("jit: turning on with \(method.rawValue)")
+        AppLog.write("jit: turning on with \(method.rawValue)")
 
         let asked: Bool
         switch method {
@@ -32,7 +32,7 @@ extension JITSession {
             }
             return
         }
-        JITLog.write("jit: debugger attached")
+        AppLog.write("jit: debugger attached")
         await check()
     }
 
@@ -52,7 +52,7 @@ extension JITSession {
             fail("StikDebug isn't installed. Install it, or choose Built-in StikJIT.")
             return false
         }
-        JITLog.write("jit: opened \(target.absoluteString)")
+        AppLog.write("jit: opened \(target.absoluteString)")
         return true
     }
 
@@ -65,7 +65,7 @@ extension JITSession {
             return false
         }
         guard let pairing = PairingFile.read() else {
-            JITLog.write("jit: built-in isn't set up (no pairing)")
+            AppLog.write("jit: built-in isn't set up (no pairing)")
             if interactive { showingSetup = true }
             return false
         }
@@ -76,12 +76,12 @@ extension JITSession {
             let summary = reply?["summary"] as? String ?? failure ?? "no reply"
             let lines = reply?["log"] as? [String] ?? []
             Task { @MainActor in
-                for line in lines { JITLog.write("helper: \(line)") }
-                JITLog.write("jit: helper replied: \(ok ? "" : "FAILED: ")\(summary)")
+                for line in lines { AppLog.write("helper: \(line)") }
+                AppLog.write("jit: helper replied: \(ok ? "" : "FAILED: ")\(summary)")
                 if !ok { self.helperFailure = summary }
             }
         }
-        JITLog.write("jit: started the built-in helper")
+        AppLog.write("jit: started the built-in helper")
         return true
     }
 
@@ -100,7 +100,7 @@ extension JITSession {
     }
 
     private func fail(_ message: String) {
-        JITLog.write("jit: turning on failed: \(message)")
+        AppLog.write("jit: turning on failed: \(message)")
         enablerError = message
     }
 }

@@ -51,7 +51,7 @@ final class JITSetup {
         let host = OnDevicePairing { [weak self] event in self?.handle(event) }
         self.host = host
         host.start()
-        JITLog.write("jit: pairing on this iPhone: starting")
+        AppLog.write("jit: pairing on this iPhone: starting")
     }
 
     func cancelPairing() {
@@ -82,7 +82,7 @@ final class JITSetup {
         if backgroundTask == .invalid {
             backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Pairing") { [weak self] in
                 guard let self else { return }
-                JITLog.write("jit: pairing: background time ran out")
+                AppLog.write("jit: pairing: background time ran out")
                 UIApplication.shared.endBackgroundTask(self.backgroundTask)
                 self.backgroundTask = .invalid
             }
@@ -102,17 +102,17 @@ final class JITSetup {
             pairing = .showing(code: code, connected: false)
             pictureInPicture.start()
             pictureInPicture.show(code: code, connected: false)
-            JITLog.write("jit: pairing: advertising")
+            AppLog.write("jit: pairing: advertising")
         case .connected:
             guard case .showing(let code, _) = pairing else { return }
             pairing = .showing(code: code, connected: true)
             pictureInPicture.show(code: code, connected: true)
-            JITLog.write("jit: pairing: Settings connected")
+            AppLog.write("jit: pairing: Settings connected")
             // Settings normally finishes within a minute of asking for the code.
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(180))
                 guard let self, case .showing(_, true) = self.pairing else { return }
-                JITLog.write("jit: pairing: no answer from Settings in 3 minutes")
+                AppLog.write("jit: pairing: no answer from Settings in 3 minutes")
                 self.cancelPairing()
                 self.pairing = .failed("Settings stopped answering before pairing finished. Try again.")
             }
@@ -129,7 +129,7 @@ final class JITSetup {
         case .failed(let message):
             finishPairing(paired: false)
             pairing = .failed(message)
-            JITLog.write("jit: pairing failed: \(message)")
+            AppLog.write("jit: pairing failed: \(message)")
         }
     }
 
@@ -182,8 +182,8 @@ final class JITSetup {
             let summary = reply?["summary"] as? String ?? failure ?? "no reply"
             let lines = reply?["log"] as? [String] ?? []
             Task { @MainActor in
-                for line in lines { JITLog.write("helper: \(line)") }
-                JITLog.write("jit: prepare: \(ok ? "" : "FAILED: ")\(summary)")
+                for line in lines { AppLog.write("helper: \(line)") }
+                AppLog.write("jit: prepare: \(ok ? "" : "FAILED: ")\(summary)")
                 self.preparation = ok ? .ready(summary) : .failed(summary)
             }
         }

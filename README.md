@@ -1,8 +1,8 @@
 # crate
 
-An iOS app that runs Linux VMs on the crate engine. JIT is real; VMs and
-installs are still sample data and stubs (search the code for `STUB`,
-`SAMPLE DATA` and `PLACEHOLDER`).
+An iOS app that runs Linux VMs on the crate engine. JIT and booting a VM to its
+console are real; installs are still sample data and stubs (search the code
+for `STUB`, `SAMPLE DATA` and `PLACEHOLDER`).
 
 Three tabs:
 
@@ -30,12 +30,29 @@ debugger, picked in Settings:
 Each launch logs its JIT steps to `Library/Caches/crate.log`, and pairing's
 messages to `Library/Caches/idevice.log`.
 
+## The engine
+
+[crate](https://github.com/oneamendez/crate) runs the VM in this process, on the
+code region JIT claimed, and shows its serial console in a terminal
+([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), MIT). No network yet:
+`Sources/Crate/Engine/NoNetwork.c` stands in for libslirp. A VM's files live in
+`Library/Application Support/VMs/<distribution>/` (`vmlinuz`, `initrd.img`,
+`disk.img`); until installs are real they're copied there from a Mac:
+
+    xcrun devicectl device copy to --device <udid> --domain-type appDataContainer \
+        --domain-identifier com.amendez.crate --user mobile \
+        --source disk.img --destination "Library/Application Support/VMs/debian/disk.img"
+
+`--user mobile` matters: without it crate can't write to the disk. Never add
+`--remove-existing-content`, which empties the app's whole container.
+
 ## Build
 
 Both libraries are fetched or built into `Frameworks/`, which isn't committed:
 
     ./Scripts/fetch-stikjit.sh     # StikJIT 2.0.1, checked against its SHA-256
     ./Scripts/build-idevice.sh     # idevice v0.1.68 from source; needs Rust
+    ./Scripts/build-crate.sh       # crate from ~/Repos/crate; needs Rust
     xcodegen generate
     open Crate.xcodeproj
 

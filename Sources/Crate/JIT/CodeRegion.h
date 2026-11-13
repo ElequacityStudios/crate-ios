@@ -53,8 +53,10 @@ typedef enum {
    the process. */
 crate_region_status crate_code_region_map(size_t size, bool below_64_gib, crate_code_region *out);
 /* Where iOS first put the region in the last crate_code_region_map, before
-   any retry lower: for the log. */
+   any move lower, and the largest free gap below 64 GiB the move found: for
+   the log. */
 extern uint64_t crate_code_region_first_offer;
+extern uint64_t crate_code_region_largest_gap;
 crate_region_status crate_code_region_finish(crate_code_region *region, bool ask_debugger);
 
 /* Writes a function that returns 42 into the region, runs it, and says whether

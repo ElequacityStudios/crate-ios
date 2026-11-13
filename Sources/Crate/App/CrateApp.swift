@@ -4,12 +4,14 @@ import SwiftUI
 struct CrateApp: App {
     @State private var store: MachineStore
     @State private var jit: JITSession
+    /// crate runs one VM per process: this is the one.
+    @State private var runner = MachineRunner()
     private let options: LaunchOptions
 
     init() {
-        JITLog.begin()
+        AppLog.begin()
         let memory = MemoryReport()
-        JITLog.write("memory: physical \(memory.physical), limit \(memory.limit.map(String.init) ?? "n/a"), "
+        AppLog.write("memory: physical \(memory.physical), limit \(memory.limit.map(String.init) ?? "n/a"), "
                      + "available \(memory.available.map(String.init) ?? "n/a"), footprint \(memory.footprint) bytes")
         options = LaunchOptions.parse(ProcessInfo.processInfo.arguments)
         options.applyToDefaults()
@@ -29,6 +31,7 @@ struct CrateApp: App {
             RootView(launchTab: options.tab, forceRail: options.rail)
                 .environment(store)
                 .environment(jit)
+                .environment(runner)
         }
     }
 }

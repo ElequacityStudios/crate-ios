@@ -47,6 +47,35 @@ static uint64_t ask_debugger_to_authorize(void *start, size_t size) {
 #define AUTHORIZABLE_END (64ULL << 30)
 
 uint64_t crate_code_region_first_offer;
+uint64_t crate_code_region_largest_gap;
+
+/* The lowest gap of at least `size` bytes in this task's address space between
+   `from` and `to`, page-aligned, found by walking its regions; 0 if none. Also
+   notes the largest gap seen, for the log. */
+static uint64_t find_gap(uint64_t from, uint64_t to, size_t size) {
+    vm_address_t address = (vm_address_t)from;
+    uint64_t cursor = from;
+    crate_code_region_largest_gap = 0;
+    for (;;) {
+        vm_size_t region_size = 0;
+        vm_region_basic_info_data_64_t info;
+        mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+        mach_port_t object = MACH_PORT_NULL;
+        kern_return_t kr = vm_region_64(mach_task_self(), &address, &region_size, VM_REGION_BASIC_INFO_64,
+                                        (vm_region_info_t)&info, &count, &object);
+        /* No region at or above `address`: the rest up to `to` is free. */
+        uint64_t next = kr == KERN_SUCCESS ? (uint64_t)address : to;
+        if (next > to) next = to;
+        if (next > cursor) {
+            uint64_t gap = next - cursor;
+            if (gap > crate_code_region_largest_gap) crate_code_region_largest_gap = gap;
+            if (gap >= size) return cursor;
+        }
+        if (kr != KERN_SUCCESS || (uint64_t)address >= to) return 0;
+        cursor = (uint64_t)address + region_size;
+        address = (vm_address_t)cursor;
+    }
+}
 
 static void *map_executable(size_t size, bool below_64_gib) {
     void *first = NULL;
@@ -56,19 +85,23 @@ static void *map_executable(size_t size, bool below_64_gib) {
 #endif
     void *exec = mmap(first, size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
     crate_code_region_first_offer = exec == MAP_FAILED ? 0 : (uint64_t)exec;
-    if (exec == MAP_FAILED || !below_64_gib || (uint64_t)exec + size <= AUTHORIZABLE_END) return exec;
-    munmap(exec, size);
-    /* Where iOS put it was too high (with extended virtual addressing it often
-       is): hint lower, 1 GiB at a time from 4 GiB, until a hint is taken. */
-    for (uint64_t hint = 4ULL << 30; hint + size <= AUTHORIZABLE_END; hint += 1ULL << 30) {
-        exec = mmap((void *)hint, size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
-        if (exec == MAP_FAILED) continue;
+    if (!below_64_gib) return exec;
+    if (exec != MAP_FAILED) {
         if ((uint64_t)exec + size <= AUTHORIZABLE_END) return exec;
         munmap(exec, size);
     }
-    errno = ENOMEM;
-    return MAP_FAILED;
+    /* Where iOS put it was too high (with extended virtual addressing it often
+       is, and a hint lower isn't always taken): map it exactly into the lowest
+       free gap above 4 GiB that ends below the limit, found by walking our own
+       address space. */
+    uint64_t gap = find_gap(4ULL << 30, AUTHORIZABLE_END, size);
+    if (gap == 0) {
+        errno = ENOMEM;
+        return MAP_FAILED;
+    }
+    return mmap((void *)gap, size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
 }
+
 
 crate_region_status crate_code_region_map(size_t size, bool below_64_gib, crate_code_region *out) {
     size_t page = (size_t)getpagesize();

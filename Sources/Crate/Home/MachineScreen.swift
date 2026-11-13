@@ -1,37 +1,33 @@
 import SwiftUI
 
-/// PLACEHOLDER for a running VM. The VM's display will fill this screen; for now
-/// it shows the screenshot and a fake boot.
+/// A VM, full screen. With JIT on it boots in crate and shows its console: a
+/// terminal on the serial port, which is all of the VM there is until the
+/// display arrives. Without JIT it offers to turn it on.
 struct MachineScreen: View {
     let machine: Machine
 
     @Environment(MachineStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(JITSession.self) private var jit
+    @Environment(MachineRunner.self) private var runner
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
 
-    @State private var phase = Phase.starting
     @State private var confirmingStop = false
+    /// Debug builds pretending JIT is on have no code region to run in: they
+    /// walk through a pretend boot instead.
+    @State private var pretendRunning = false
 
-    enum Phase {
-        case needsJIT
-        case starting
-        case running
-    }
+    private var isThisMachine: Bool { runner.machineID == machine.id }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            MachineScreenshot(machine: machine)
-                .aspectRatio(4 / 3, contentMode: .fit)
-                .padding()
-                .opacity(phase == .running ? 1 : 0.3)
-                .blur(radius: phase == .running ? 0 : 6)
-            status
+        VStack(spacing: 0) {
+            topBar
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .overlay(alignment: .top) { topBar }
+        .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
-        .task(id: jit.isOn) { await boot() }
+        .task(id: jit.isOn) { boot() }
         .sheet(isPresented: Bindable(jit).showingSetup) {
             JITSetupView()
                 .environment(jit)
@@ -39,11 +35,15 @@ struct MachineScreen: View {
         }
     }
 
-    /// Close before the VM runs; Stop, confirmed, once it does, since stopping
-    /// a running VM loses whatever its guest hasn't saved.
+    private var isRunning: Bool {
+        (isThisMachine && runner.isRunning) || pretendRunning
+    }
+
+    /// Stop, confirmed, while the VM runs, since it loses whatever its guest
+    /// hasn't saved; Close otherwise.
     private var topBar: some View {
         HStack {
-            if phase == .running {
+            if isRunning {
                 Button {
                     confirmingStop = true
                 } label: {
@@ -54,7 +54,7 @@ struct MachineScreen: View {
                 .buttonBorderShape(.capsule)
                 .confirmationDialog("Stop \(machine.name)?", isPresented: $confirmingStop,
                                     titleVisibility: .visible) {
-                    Button("Stop VM", role: .destructive) { dismiss() }
+                    Button("Stop VM", role: .destructive) { stop() }
                 } message: {
                     Text("Anything not saved in \(machine.name) is lost.")
                 }
@@ -72,71 +72,133 @@ struct MachineScreen: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal)
-        .padding(.top, 8)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
-    private var status: some View {
-        switch phase {
-        case .needsJIT:
-            VStack(spacing: 14) {
-                Image(systemName: "bolt.slash.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.yellow)
-                Text("JIT Is Off")
-                    .font(.title2.bold())
-                Text("crate needs JIT to run \(machine.name). Turn it on, then the VM starts.")
+    private var content: some View {
+        if !jit.isOn {
+            centered { needsJIT }
+        } else if jit.region == nil {
+            pretendBoot
+        } else if isThisMachine {
+            switch runner.phase {
+            case .idle, .starting, .running:
+                ConsoleView(bridge: runner.console)
+            case .stopped(let message):
+                centered { ended(message, failed: false) }
+            case .failed(let message):
+                centered { ended(message, failed: true) }
+            }
+        } else if runner.isRunning {
+            centered {
+                Text("Another VM is running. Stop it first: crate runs one VM at a time.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
-                Button {
-                    Task { await jit.turnOn(JITMethod(rawValue: jitMethod) ?? .standard) }
-                } label: {
-                    if jit.isTurningOn {
-                        ProgressView().frame(maxWidth: .infinity)
-                    } else {
-                        Label("Turn On JIT", systemImage: "bolt.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .disabled(jit.isTurningOn)
             }
+        } else {
+            centered { ProgressView().controlSize(.large) }
+        }
+    }
+
+    private func centered(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
             .padding(24)
-            .frame(maxWidth: 360)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .padding()
-        case .starting:
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.large)
-                Text("Starting \(machine.name)…")
-                    .font(.headline)
+            .frame(maxWidth: 380)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var needsJIT: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "bolt.slash.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(.yellow)
+            Text("JIT Is Off")
+                .font(.title2.bold())
+            Text("crate needs JIT to run \(machine.name). Turn it on, then the VM starts.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await jit.turnOn(JITMethod(rawValue: jitMethod) ?? .standard) }
+            } label: {
+                if jit.isTurningOn {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else {
+                    Label("Turn On JIT", systemImage: "bolt.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
             }
-        case .running:
-            VStack {
-                Spacer()
-                Text("Placeholder: the VM's display goes here")
-                    .font(.footnote.weight(.medium))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.bottom)
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .disabled(jit.isTurningOn)
+        }
+        .padding(24)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    private func ended(_ message: String, failed: Bool) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: failed ? "exclamationmark.triangle.fill" : "power")
+                .font(.system(size: 40))
+                .foregroundStyle(failed ? .orange : .secondary)
+            Text(message)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Button {
+                boot()
+            } label: {
+                Label("Start Again", systemImage: "play.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+        }
+    }
+
+    /// Debug builds pretending JIT is on: the screenshot and a pretend boot.
+    private var pretendBoot: some View {
+        ZStack {
+            MachineScreenshot(machine: machine)
+                .aspectRatio(4 / 3, contentMode: .fit)
+                .padding()
+                .opacity(pretendRunning ? 1 : 0.3)
+                .blur(radius: pretendRunning ? 0 : 6)
+            if !pretendRunning {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Starting \(machine.name)…")
+                        .font(.headline)
+                }
             }
         }
     }
 
-    private func boot() async {
-        guard jit.isOn else {
-            phase = .needsJIT
+    private func boot() {
+        guard jit.isOn else { return }
+        guard let region = jit.region else {
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                withAnimation { pretendRunning = true }
+            }
             return
         }
-        phase = .starting
-        try? await Task.sleep(for: .seconds(1.5))
-        guard !Task.isCancelled else { return }
-        withAnimation { phase = .running }
+        // Already running this VM (the screen reopened), or another one.
+        guard !runner.isRunning else { return }
+        runner.start(machine, region: region)
         store.markStarted(machine)
+    }
+
+    private func stop() {
+        if pretendRunning {
+            pretendRunning = false
+            dismiss()
+            return
+        }
+        runner.stop()
     }
 }

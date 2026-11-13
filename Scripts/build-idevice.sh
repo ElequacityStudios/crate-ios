@@ -63,10 +63,12 @@ for target in $TARGETS; do
     ARGS+=(-library "$WORK/$target/libidevice_ffi.a" -headers "$WORK/include")
 done
 
-# cbindgen writes ffi/idevice.h during the build; plist.h sits beside it.
-mkdir -p "$WORK/include"
-cp "$SRC/ffi/idevice.h" "$SRC/ffi/plist.h" "$WORK/include/"
-cat > "$WORK/include/module.modulemap" <<'MAP'
+# cbindgen writes ffi/idevice.h during the build; plist.h sits beside it. In a
+# folder named for the module, so its module map can't collide with another
+# library's when Xcode copies headers into the build's include/.
+mkdir -p "$WORK/include/IDevice"
+cp "$SRC/ffi/idevice.h" "$SRC/ffi/plist.h" "$WORK/include/IDevice/"
+cat > "$WORK/include/IDevice/module.modulemap" <<'MAP'
 module IDevice {
     header "idevice.h"
     export *
