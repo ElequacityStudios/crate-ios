@@ -10,6 +10,7 @@ struct JITSetupView: View {
 
     @State private var setup = JITSetup()
     @State private var importing = false
+    @State private var confirmingForget = false
 
     var body: some View {
         NavigationStack {
@@ -53,7 +54,10 @@ struct JITSetupView: View {
                     Task { await setup.checkTunnel() }
                 }
             }
-            .onDisappear { setup.cancelPairing() }
+            .onDisappear {
+                setup.cancelPairing()
+                jit.pairingChanged()
+            }
         }
     }
 
@@ -84,6 +88,17 @@ struct JITSetupView: View {
                 Button("Try Again", systemImage: "arrow.clockwise") { setup.startPairing() }
             }
             Button("Use a Pairing File Instead", systemImage: "doc.badge.plus") { importing = true }
+            if setup.hasPairingFile && setup.pairing == .idle {
+                Button("Forget Pairing", systemImage: "link.badge.minus", role: .destructive) {
+                    confirmingForget = true
+                }
+                .confirmationDialog("Forget this iPhone's pairing?", isPresented: $confirmingForget,
+                                    titleVisibility: .visible) {
+                    Button("Forget Pairing", role: .destructive) { setup.forgetPairing() }
+                } message: {
+                    Text("Built-in StikJIT can't turn JIT on until crate is paired again. StikDebug doesn't use this pairing.")
+                }
+            }
             if let importError = setup.importError {
                 Text(importError)
                     .foregroundStyle(.orange)

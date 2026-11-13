@@ -133,6 +133,13 @@ final class JITSetup {
         }
     }
 
+    func forgetPairing() {
+        cancelPairing()
+        PairingFile.forget()
+        hasPairingFile = false
+        preparation = .idle
+    }
+
     func importFile(_ result: Result<URL, Error>) {
         importError = nil
         do {

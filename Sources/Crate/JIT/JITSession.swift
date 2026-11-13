@@ -66,6 +66,13 @@ final class JITSession {
     var helperFailure: String?
     /// Built-in StikJIT isn't set up yet: shows the Set Up JIT sheet.
     var showingSetup = false
+    /// Whether Built-in StikJIT has a pairing, for Settings' Set Up JIT row.
+    private(set) var isPaired = PairingFile.exists
+
+    /// Re-reads `isPaired` after Set Up JIT may have changed it.
+    func pairingChanged() {
+        isPaired = PairingFile.exists
+    }
 
     /// Checks at launch: when a debugger is already attached (crate was
     /// started from one), claims the region in the background.

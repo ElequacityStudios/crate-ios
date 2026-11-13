@@ -67,7 +67,7 @@ struct SettingsScreen: View {
                     jit.showingSetup = true
                 } label: {
                     LabeledContent {
-                        Text(PairingFile.exists ? "Paired" : "Not Set Up")
+                        Text(jit.isPaired ? "Paired" : "Not Set Up")
                     } label: {
                         Label("Set Up JIT", systemImage: "checklist")
                     }

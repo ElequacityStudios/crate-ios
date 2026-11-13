@@ -35,6 +35,14 @@ enum PairingFile {
         JITLog.write("jit: paired this iPhone (\(data.count)-byte record)")
     }
 
+    /// Deletes crate's copy. iOS keeps its side of a pairing made on this
+    /// iPhone (it lists none for crate to remove), but without this copy crate
+    /// can't use it.
+    static func forget() {
+        try? FileManager.default.removeItem(at: url)
+        JITLog.write("jit: forgot the pairing")
+    }
+
     /// Copies a file the person picked in Files over the stored one.
     static func importFile(from source: URL) throws {
         let scoped = source.startAccessingSecurityScopedResource()
