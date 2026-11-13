@@ -1,7 +1,7 @@
 # crate
 
 An iOS app that runs Linux VMs on the crate engine. JIT and booting a VM to its
-console are real; installs are still sample data and stubs (search the code
+desktop are real; installs are still sample data and stubs (search the code
 for `STUB`, `SAMPLE DATA` and `PLACEHOLDER`).
 
 Three tabs:
@@ -33,7 +33,9 @@ messages to `Library/Caches/idevice.log`.
 ## The engine
 
 [crate](https://github.com/oneamendez/crate) runs the VM in this process, on the
-code region JIT claimed, and shows its serial console in a terminal
+code region JIT claimed. The VM screen switches between its display (a virtio
+GPU the guest draws on in software, frames handed straight to the app, touch
+and keys as a virtio tablet and keyboard) and its serial console in a terminal
 ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), MIT). No network yet:
 `Sources/Crate/Engine/NoNetwork.c` stands in for libslirp. A VM's files live in
 `Library/Application Support/VMs/<distribution>/` (`vmlinuz`, `initrd.img`,

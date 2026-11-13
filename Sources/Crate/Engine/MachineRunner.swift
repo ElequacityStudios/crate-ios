@@ -9,8 +9,9 @@ import Observation
 /// code runs from the region JITSession claimed at launch: crate never asks a
 /// debugger for memory itself. The console is the serial port (ttyAMA0), which
 /// shows the kernel from its first line; ConsoleBridge carries it to the
-/// screen. No network yet (NoNetwork.c), and no display: step one is a boot to
-/// a shell.
+/// screen. The display is a virtio GPU the guest draws on in software (2D), with
+/// a virtio keyboard and tablet; DisplayBridge carries frames out and input in.
+/// No network yet (NoNetwork.c).
 @MainActor @Observable
 final class MachineRunner {
     enum Phase: Equatable {
@@ -25,6 +26,7 @@ final class MachineRunner {
     /// The VM this runner is running, or last ran.
     private(set) var machineID: Machine.ID?
     let console = ConsoleBridge()
+    let display = DisplayBridge()
     private var machine: OpaquePointer?
 
     init() {
@@ -66,15 +68,17 @@ final class MachineRunner {
         AppLog.write("vm: starting \(vm.name): \(settings.cpus) CPUs, \(settings.memoryMiB) MiB, "
                      + "code \(region.size >> 20) MiB; \(settings.commandLine)")
         let console = self.console
+        let display = self.display
         let context = Unmanaged.passUnretained(self).toOpaque()
         Task.detached(priority: .userInitiated) {
             let started = Date.now
-            let result = Self.create(settings, region: region, console: console, context: context)
+            let result = Self.create(settings, region: region, console: console, display: display, context: context)
             await MainActor.run {
                 switch result {
                 case .success(let made):
                     self.machine = made
                     console.attach(machine: made)
+                    display.attach(machine: made)
                     if crate_machine_start(made) == CRATE_OK {
                         AppLog.write(String(format: "vm: running, created in %.2f s", Date.now.timeIntervalSince(started)))
                         self.phase = .running
@@ -107,6 +111,7 @@ final class MachineRunner {
         let initrd: String
         let disk: String
         let commandLine: String
+        let displayModes: [crate_display_mode]
 
         init(vm: Machine, files: GuestFiles) {
             // A core left for the app and iOS.
@@ -116,6 +121,20 @@ final class MachineRunner {
             initrd = files.initrd.path
             disk = files.disk.path
             commandLine = Self.commandLine
+            displayModes = Self.modes(preferring: vm.display)
+        }
+
+        /// The VM's own display size first ("1280 × 800"), the size its desktop
+        /// starts at, then a few others the guest can change to.
+        static func modes(preferring display: String) -> [crate_display_mode] {
+            let numbers = display.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+            var sizes = [(1280, 800), (1024, 768), (1920, 1200), (800, 600)]
+            if numbers.count == 2 {
+                let preferred = (numbers[0], numbers[1])
+                sizes.removeAll { $0 == preferred }
+                sizes.insert(preferred, at: 0)
+            }
+            return sizes.map { crate_display_mode(width: UInt32($0.0), height: UInt32($0.1)) }
         }
 
         /// What the VM asked for, unless that wouldn't fit beside the app in
@@ -130,12 +149,14 @@ final class MachineRunner {
             return min(asked, fits)
         }
 
-        /// Serial console, the disk as the root, and only what a shell needs:
-        /// no display yet, so nothing graphical, and no getty on screens that
-        /// aren't there.
+        /// Serial console, the disk as the root, and the desktop pulled in at
+        /// boot (the image doesn't enable it). multi-user rather than the image's
+        /// graphical target, which starts nothing the desktop service doesn't;
+        /// no getty on tty1, which the desktop takes.
         static let commandLine = ([
             "console=ttyAMA0", "root=/dev/vda", "rw", "net.ifnames=0",
             "vt.global_cursor_default=0", "systemd.unit=multi-user.target",
+            "systemd.wants=aterm-desktop.service",
         ] + [
             "systemd-timesyncd.service", "e2scrub_reap.service", "apt-daily.timer",
             "apt-daily-upgrade.timer", "man-db.timer",
@@ -150,7 +171,8 @@ final class MachineRunner {
     }
 
     nonisolated private static func create(_ settings: Settings, region: crate_code_region,
-                                           console: ConsoleBridge, context: UnsafeMutableRawPointer) -> Created {
+                                           console: ConsoleBridge, display: DisplayBridge,
+                                           context: UnsafeMutableRawPointer) -> Created {
         guard let config = crate_config_new("virt") else { return .failure("crate doesn't know the virt board.") }
         defer { crate_config_free(config) }
         func check(_ status: crate_status, _ what: String) -> String? {
@@ -170,6 +192,16 @@ final class MachineRunner {
                 var index: UInt32 = 0
                 return check(crate_config_add_console(config, CRATE_CONSOLE_SERIAL, &callbacks, &index), "the console")
             },
+            {
+                var callbacks = display.callbacks
+                var index: UInt32 = 0
+                if let failure = check(crate_config_add_display(config, CRATE_GPU_2D, &callbacks, &index), "the display") {
+                    return failure
+                }
+                let modes = settings.displayModes
+                return check(crate_config_set_display_modes(config, index, modes, modes.count), "the display's sizes")
+            },
+            { check(crate_config_add_input(config, CRATE_INPUT_KEYBOARD | CRATE_INPUT_TABLET), "the keyboard and tablet") },
             {
                 check(crate_config_set_state_callback(config, { context, state, reason in
                     guard let context, state == CRATE_STATE_STOPPED else { return }
@@ -198,6 +230,7 @@ final class MachineRunner {
         }
         AppLog.write("vm: \(text)")
         console.detach()
+        display.detach()
         phase = reason == CRATE_STOP_ERROR ? .failed(text) : .stopped(text)
     }
 }

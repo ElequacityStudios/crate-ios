@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// A VM, full screen. With JIT on it boots in crate and shows its console: a
-/// terminal on the serial port, which is all of the VM there is until the
-/// display arrives. Without JIT it offers to turn it on.
+/// A VM, full screen. With JIT on it boots in crate and shows either its screen
+/// or its console, a terminal on the serial port, with a switch between them
+/// in the top bar. Without JIT it offers to turn it on.
 struct MachineScreen: View {
     let machine: Machine
 
@@ -13,6 +13,15 @@ struct MachineScreen: View {
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
 
     @State private var confirmingStop = false
+    @State private var showing = Showing.display
+    @State private var showsKeyboard = false
+    @State private var hasPicture = false
+
+    /// The VM's screen, or its console.
+    enum Showing: Hashable {
+        case display
+        case console
+    }
     /// Debug builds pretending JIT is on have no code region to run in: they
     /// walk through a pretend boot instead.
     @State private var pretendRunning = false
@@ -58,6 +67,9 @@ struct MachineScreen: View {
                 } message: {
                     Text("Anything not saved in \(machine.name) is lost.")
                 }
+                if jit.region != nil {
+                    switcher
+                }
             } else {
                 Button("Close", systemImage: "xmark") { dismiss() }
                     .labelStyle(.iconOnly)
@@ -75,6 +87,28 @@ struct MachineScreen: View {
         .padding(.vertical, 8)
     }
 
+    /// Screen or console, and the keyboard while the screen shows.
+    @ViewBuilder
+    private var switcher: some View {
+        Picker("Show", selection: $showing) {
+            Label("Display", systemImage: "display").tag(Showing.display)
+            Label("Terminal", systemImage: "apple.terminal").tag(Showing.console)
+        }
+        .pickerStyle(.segmented)
+        .labelStyle(.iconOnly)
+        .fixedSize()
+        if showing == .display {
+            Button(showsKeyboard ? "Hide Keyboard" : "Show Keyboard",
+                   systemImage: showsKeyboard ? "keyboard.chevron.compact.down" : "keyboard") {
+                showsKeyboard.toggle()
+            }
+            .labelStyle(.iconOnly)
+            .font(.headline)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         if !jit.isOn {
@@ -84,7 +118,23 @@ struct MachineScreen: View {
         } else if isThisMachine {
             switch runner.phase {
             case .idle, .starting, .running:
-                ConsoleView(bridge: runner.console)
+                if showing == .display {
+                    DisplayView(bridge: runner.display, showsKeyboard: $showsKeyboard, hasPicture: $hasPicture)
+                        .overlay {
+                            if !hasPicture {
+                                VStack(spacing: 12) {
+                                    ProgressView().controlSize(.large)
+                                    Text("Starting the desktop…")
+                                        .font(.headline)
+                                    Text("The terminal shows the boot.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                } else {
+                    ConsoleView(bridge: runner.console)
+                }
             case .stopped(let message):
                 centered { ended(message, failed: false) }
             case .failed(let message):
