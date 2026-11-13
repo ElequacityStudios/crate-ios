@@ -262,9 +262,9 @@ enum InstallProgress: Equatable {
     }
 }
 
-/// One downloadable image: badge, name with the version beside it, and a check
-/// when selected. At the accessibility text sizes the text goes under the
-/// badge, so the name has the row's full width.
+/// One downloadable image: its name with the version beside it, and a check
+/// when selected. At the accessibility text sizes the version goes under the
+/// name.
 struct CatalogRow: View {
     let image: CatalogImage
     let isSelected: Bool
@@ -275,24 +275,10 @@ struct CatalogRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            Group {
-                if typeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            DistributionBadge(distribution: image.distribution, size: 44)
-                            Spacer(minLength: 0)
-                            checkmark
-                        }
-                        text
-                    }
-                } else {
-                    HStack(spacing: 14) {
-                        DistributionBadge(distribution: image.distribution, size: 44)
-                        text
-                        Spacer(minLength: 0)
-                        checkmark
-                    }
-                }
+            HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 14) {
+                text
+                Spacer(minLength: 0)
+                checkmark
             }
             .padding(.vertical, 4)
             .contentShape(Rectangle())

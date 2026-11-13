@@ -127,18 +127,18 @@ struct SettingsScreen: View {
 
     private var memorySection: some View {
         Section {
-            LabeledContent("Increased memory limit",
+            LabeledContent("Increased limit",
                            value: memory.hasIncreasedLimit ? "Yes" : "No")
-            LabeledContent("Most crate can claim") {
-                Text(memory.limit.map(Format.memory) ?? "Not reported")
+            LabeledContent("Memory limit") {
+                Text(memory.limit.map { Format.memory($0) } ?? "Not reported")
                     .monospacedDigit()
             }
-            LabeledContent("Free for crate now") {
-                Text(memory.available.map(Format.memory) ?? "Not reported")
+            LabeledContent("Available memory") {
+                Text(memory.available.map { Format.memory($0, decimals: 2) } ?? "Not reported")
                     .monospacedDigit()
                     .contentTransition(.numericText())
             }
-            LabeledContent("Memory in this iPhone") {
+            LabeledContent("Total memory") {
                 Text(Format.memory(memory.physical))
                     .monospacedDigit()
             }
@@ -153,7 +153,7 @@ struct SettingsScreen: View {
         if memory.available == nil {
             return "The Simulator has no memory limit, so iOS reports nothing here. On an iPhone these come from iOS and update every few seconds."
         }
-        return "A VM's memory comes out of what crate can claim. iOS sets that limit; the increased-memory-limit entitlement raises it."
+        return "A VM's memory comes out of the available memory, up to the limit iOS sets. The increased-memory-limit entitlement raises the limit."
     }
 
     /// Re-reads the figures every few seconds while Settings is on screen.

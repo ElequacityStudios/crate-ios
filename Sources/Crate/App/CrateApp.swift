@@ -8,6 +8,9 @@ struct CrateApp: App {
 
     init() {
         JITLog.begin()
+        let memory = MemoryReport()
+        JITLog.write("memory: physical \(memory.physical), limit \(memory.limit.map(String.init) ?? "n/a"), "
+                     + "available \(memory.available.map(String.init) ?? "n/a"), footprint \(memory.footprint) bytes")
         options = LaunchOptions.parse(ProcessInfo.processInfo.arguments)
         options.applyToDefaults()
         let store = MachineStore()

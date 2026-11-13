@@ -11,10 +11,12 @@ enum Format {
     }
 
     /// Memory in the binary units it's sold in: an "8 GB" iPhone has 8 GiB, and
-    /// a VM given "4 GB" gets 4 GiB.
-    static func memory(_ count: UInt64) -> String {
+    /// a VM given "4 GB" gets 4 GiB. Up to one decimal place, or exactly
+    /// `decimals` for a figure that moves, so it doesn't look round when it isn't.
+    static func memory(_ count: UInt64, decimals: Int? = nil) -> String {
         let gib = Double(count) / 1_073_741_824
-        if gib >= 1 { return "\(gib.formatted(.number.precision(.fractionLength(0...1)))) GB" }
+        let places = decimals.map { $0...$0 } ?? 0...1
+        if gib >= 1 { return "\(gib.formatted(.number.precision(.fractionLength(places)))) GB" }
         return "\(Int((Double(count) / 1_048_576).rounded())) MB"
     }
 

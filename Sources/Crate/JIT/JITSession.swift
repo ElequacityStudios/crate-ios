@@ -142,16 +142,23 @@ final class JITSession {
         }
 
         let size = sizeMB << 20
-        JITLog.write("jit: claiming \(sizeMB) MB, authorized=\(needsAuthorization)")
         let started = Date.now
         var region = crate_code_region()
-        let status = crate_code_region_claim(size, needsAuthorization, &region)
+        if crate_code_region_map(size, needsAuthorization, &region) != CRATE_REGION_OK {
+            let errorText = String(cString: strerror(errno))
+            return failure(needsAuthorization
+                ? "iOS wouldn't map \(sizeMB) MB for code low enough for the debugger to authorize (\(errorText)). Try a smaller code region."
+                : "iOS wouldn't map \(sizeMB) MB for code (\(errorText)). Try a smaller code region.")
+        }
+        // Logged before the step that can kill the process, so a crash there has an address.
+        JITLog.write("jit: claiming \(sizeMB) MB at \(String(UInt(bitPattern: region.executable), radix: 16)) "
+                     + "(iOS first offered \(String(crate_code_region_first_offer, radix: 16))), "
+                     + "authorized=\(needsAuthorization)")
+        let status = crate_code_region_finish(&region, needsAuthorization)
         let errorText = String(cString: strerror(errno))
         switch status {
         case CRATE_REGION_OK:
             break
-        case CRATE_REGION_MAP_FAILED:
-            return failure("iOS wouldn't map \(sizeMB) MB for code (\(errorText)). Try a smaller code region.")
         case CRATE_REGION_REFUSED:
             return failure("The debugger refused to authorize crate's code region. If it's StikDebug, choose the legacy.js script for crate.")
         case CRATE_REGION_REMAP_FAILED:

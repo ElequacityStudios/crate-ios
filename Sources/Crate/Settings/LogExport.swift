@@ -15,7 +15,7 @@ enum LogExport {
             "date: \(Date.now.formatted(.iso8601))",
             "device: \(deviceModel), iOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
             "memory: physical \(Format.memory(memory.physical)), "
-                + "available \(memory.available.map(Format.memory) ?? "n/a"), "
+                + "available \(memory.available.map { Format.memory($0) } ?? "n/a"), "
                 + "footprint \(Format.memory(memory.footprint))",
             "jit method: \(UserDefaults.standard.string(forKey: SettingsKey.jitMethod) ?? JITMethod.standard.rawValue)",
             "",

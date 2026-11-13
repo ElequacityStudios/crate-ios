@@ -88,27 +88,24 @@ struct MachineCard: View {
         }
     }
 
-    /// Badge, name and version, and the More menu. At the accessibility text
-    /// sizes the name and version go under the badge, so they have the card's
-    /// full width.
+    /// Name and version, and the More menu. At the accessibility text sizes the
+    /// version goes under the name, which shares its row only with the menu.
     @ViewBuilder
     private var header: some View {
         if typeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    DistributionBadge(distribution: machine.distribution, size: 44)
+                HStack(alignment: .top) {
+                    Text(machine.name)
+                        .font(.title2.bold())
                     Spacer(minLength: 0)
                     moreMenu
                 }
-                Text(machine.name)
-                    .font(.title2.bold())
                 Text("\(machine.versionLabel) · \(machine.distribution.family.title)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
         } else {
             HStack(spacing: 12) {
-                DistributionBadge(distribution: machine.distribution, size: 44)
                 // The version beside the name when there's room, under it when not.
                 ViewThatFits(in: .horizontal) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -206,7 +203,9 @@ struct MachineScreenshot: View {
                         .scaledToFill()
                 } else {
                     VStack(spacing: 10) {
-                        DistributionBadge(distribution: machine.distribution, size: 56)
+                        Image(systemName: "display")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
                         Text("No screenshot yet")
                             .font(.footnote)
                             .foregroundStyle(.secondary)

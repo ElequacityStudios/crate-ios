@@ -10,6 +10,9 @@ struct HomeScreen: View {
 
     @State private var deleting: Machine?
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// Each card's height, fixed while scrolling (see fixCardHeight).
+    @State private var cardHeight: CGFloat?
+    @State private var cardHeightScreen: CGSize = .zero
 
     var body: some View {
         NavigationStack {
@@ -45,6 +48,14 @@ struct HomeScreen: View {
         }
     }
 
+    /// A card is 75% of the visible height, measured once per screen size.
+    /// Measured continuously, cards grew as the title collapsed under a scroll.
+    private func fixCardHeight(for viewport: Viewport) {
+        guard cardHeight == nil || viewport.screen != cardHeightScreen else { return }
+        cardHeightScreen = viewport.screen
+        cardHeight = (viewport.visibleHeight * 0.75).rounded()
+    }
+
     private var cards: some View {
         ScrollView {
             LazyVStack(spacing: 20) {
@@ -55,28 +66,36 @@ struct HomeScreen: View {
                         onStart: { onStart(machine) },
                         onToggleDefault: { store.toggleDefault(machine) },
                         onDelete: { deleting = machine })
-                    .modifier(ViewportHeight(fraction: typeSize.isAccessibilitySize ? nil : 0.75))
+                    // At the accessibility text sizes a card grows to fit its text.
+                    .frame(height: typeSize.isAccessibilitySize ? nil : cardHeight)
                 }
             }
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.viewAligned)
+        .onGeometryChange(for: Viewport.self) { proxy in
+            Viewport(proxy)
+        } action: { viewport in
+            fixCardHeight(for: viewport)
+        }
         .contentMargins(.horizontal, 16, for: .scrollContent)
         .contentMargins(.vertical, 12, for: .scrollContent)
     }
 }
 
-/// Sizes a card to a fraction of the scroll view's height, or leaves it to
-/// its content when the fraction is nil.
-private struct ViewportHeight: ViewModifier {
-    let fraction: CGFloat?
+/// The scroll view's visible height, and the size of the whole screen area it
+/// sits in. Scrolling collapses the large title, which grows the visible
+/// height and shrinks the top inset by the same amount, so the whole stays put
+/// until the screen really changes: rotation, or the Duo folding.
+private struct Viewport: Equatable {
+    let visibleHeight: CGFloat
+    let screen: CGSize
 
-    func body(content: Content) -> some View {
-        if let fraction {
-            content.containerRelativeFrame(.vertical) { height, _ in height * fraction }
-        } else {
-            content
-        }
+    init(_ proxy: GeometryProxy) {
+        visibleHeight = proxy.size.height
+        let insets = proxy.safeAreaInsets
+        screen = CGSize(width: proxy.size.width,
+                        height: proxy.size.height + insets.top + insets.bottom)
     }
 }
 
