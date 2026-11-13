@@ -54,7 +54,8 @@ final class DebugHooks {
             try? files.removeItem(at: size)
             let numbers = text.split(whereSeparator: { !$0.isNumber }).compactMap { Double($0) }
             if numbers.count == 2 {
-                Task { @MainActor in display.fit(CGSize(width: numbers[0], height: numbers[1])) }
+                let size = CGSize(width: numbers[0], height: numbers[1])
+                Task { @MainActor in display.fit(size, window: size) }
             }
         }
     }

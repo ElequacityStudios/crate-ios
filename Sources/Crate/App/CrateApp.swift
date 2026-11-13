@@ -6,6 +6,9 @@ struct CrateApp: App {
     @State private var jit: JITSession
     /// crate runs one VM per process: this is the one.
     @State private var runner = MachineRunner()
+    /// Here rather than on the Install screen, so an install carries on while
+    /// another tab shows.
+    @State private var installer = Installer()
     private let options: LaunchOptions
 
     init() {
@@ -32,6 +35,7 @@ struct CrateApp: App {
                 .environment(store)
                 .environment(jit)
                 .environment(runner)
+                .environment(installer)
         }
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsScreen: View {
     @Environment(MachineStore.self) private var store
     @Environment(JITSession.self) private var jit
+    @Environment(MachineRunner.self) private var runner
 
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
     @AppStorage(SettingsKey.jitAtLaunch) private var jitAtLaunch = true
@@ -191,14 +192,17 @@ struct SettingsScreen: View {
             Button("Remove All VMs", role: .destructive) { confirmingRemoveAll = true }
                 .confirmationDialog("Remove all VMs?", isPresented: $confirmingRemoveAll,
                                     titleVisibility: .visible) {
-                    Button("Remove All VMs", role: .destructive) { store.removeAll() }
+                    Button("Remove All VMs", role: .destructive) {
+                        runner.stop()
+                        store.deleteAll()
+                    }
                 } message: {
                     Text("Their disks are removed from this iPhone. This can't be undone.")
                 }
         } header: {
             Text("UI Preview")
         } footer: {
-            Text("Stand-ins for parts that aren't wired in yet. Pretending JIT is on shows the screens that need it; relaunch to see the default VM boot.")
+            Text("Stand-ins for parts that aren't wired in yet. Pretending JIT is on shows the screens that need it.")
         }
     }
 }

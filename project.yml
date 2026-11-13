@@ -49,6 +49,8 @@ targets:
         # The JIT helper finds the iPhone's Remote Pairing service over Bonjour
         # when LocalDevVPN's usual address doesn't answer.
         NSLocalNetworkUsageDescription: crate looks for this iPhone's Remote Pairing service to turn on JIT.
+        # Screenshots of a VM's screen go into Photos; crate adds, never reads.
+        NSPhotoLibraryAddUsageDescription: crate saves screenshots of your VMs to Photos.
         # ...and pairs this iPhone with crate by advertising as a computer.
         NSBonjourServices:
           - _remotepairing._tcp

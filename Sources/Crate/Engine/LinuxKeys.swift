@@ -6,6 +6,8 @@ import UIKit
 /// when it needs it.
 enum LinuxKeys {
     static let leftShift: UInt16 = 42
+    /// Ctrl, Shift, Alt and Super, left and right.
+    static let modifiers: Set<UInt16> = [29, 42, 56, 125, 97, 54, 100, 126]
 
     /// A hardware key, by its HID usage (UIKey.keyCode).
     static func code(for usage: UIKeyboardHIDUsage) -> UInt16? {

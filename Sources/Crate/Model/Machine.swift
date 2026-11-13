@@ -16,6 +16,20 @@ struct Machine: Identifiable, Codable, Hashable {
     /// An asset name. Nil until the VM has run once and there is something to show.
     var screenshot: String?
     var lastStarted: Date?
+    /// The catalog image it was installed from ("debian-kde"); nil for a VM
+    /// put on the iPhone by hand.
+    var imageID: String?
+    /// The kernel command line its image boots with; nil for one put on by
+    /// hand, which gets MachineRunner's own.
+    var cmdline: String?
+    /// On iPhone Duo in landscape, the desktop runs on under the side bar to
+    /// the screen's edge. Nil, from before there was the choice, is on.
+    var fullWidthInLandscape: Bool?
+    /// When its card's preview (GuestFiles.preview) was last saved; nil
+    /// before it has been stopped from its screen.
+    var previewDate: Date?
+
+    var isFullWidthInLandscape: Bool { fullWidthInLandscape ?? true }
 
     var distribution: Distribution { .named(distributionID) }
     var name: String { distribution.name }

@@ -5,6 +5,9 @@ import SwiftUI
 /// and turns typing into the bytes a terminal sends.
 struct ConsoleView: UIViewRepresentable {
     let bridge: ConsoleBridge
+    /// Each new value brings the keyboard up: iPhone Duo folded like a laptop,
+    /// its half below the fold made for one.
+    var keyboardRequests = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator(bridge: bridge)
@@ -16,13 +19,25 @@ struct ConsoleView: UIViewRepresentable {
         view.nativeBackgroundColor = .black
         view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
         view.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        // The replay of what the guest printed so far (connect hands it over
+        // at once, and SwiftTerm answers as it reads) holds its old questions
+        // to the terminal, such as systemd asking at boot where the cursor is.
+        // Answered now, long after the asker gave up, the answers would reach
+        // whatever reads the console next: the login prompt, as typed text.
+        context.coordinator.answering = false
         bridge.connect { [weak view] bytes in
             view?.feed(byteArray: bytes[...])
         }
+        context.coordinator.answering = true
         return view
     }
 
-    func updateUIView(_ view: TerminalView, context: Context) {}
+    func updateUIView(_ view: TerminalView, context: Context) {
+        if keyboardRequests != context.coordinator.keyboardRequests {
+            context.coordinator.keyboardRequests = keyboardRequests
+            view.becomeFirstResponder()
+        }
+    }
 
     static func dismantleUIView(_ view: TerminalView, coordinator: Coordinator) {
         coordinator.bridge.disconnect()
@@ -30,12 +45,17 @@ struct ConsoleView: UIViewRepresentable {
 
     final class Coordinator: NSObject, TerminalViewDelegate {
         let bridge: ConsoleBridge
+        /// False while replaying old output, whose questions are stale.
+        var answering = true
+        /// ConsoleView.keyboardRequests, as last acted on.
+        var keyboardRequests = 0
 
         init(bridge: ConsoleBridge) {
             self.bridge = bridge
         }
 
         func send(source: TerminalView, data: ArraySlice<UInt8>) {
+            guard answering else { return }
             bridge.send(data)
         }
 

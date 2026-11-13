@@ -1,14 +1,16 @@
 # crate
 
-An iOS app that runs Linux VMs on the crate engine. JIT and booting a VM to its
-desktop are real; installs are still sample data and stubs (search the code
-for `STUB`, `SAMPLE DATA` and `PLACEHOLDER`).
+An iOS app that runs Linux VMs on the crate engine: JIT, installing a VM,
+and booting it to its desktop. A few UI stand-ins remain (search the code for
+`STUB`, `SAMPLE DATA` and `PLACEHOLDER`).
 
 Three tabs:
 
-- **Home**: the installed VMs, one large card each, with Start. The starred VM
-  boots at launch when JIT is on.
-- **Install Vms**: the downloadable images, a memory limit, and Install.
+- **Home**: the installed VMs, one large card each, with the screen each was
+  showing when last stopped (`preview.jpg` in its folder) and Start. A card's
+  menu has the VM's settings (on iPhone Duo) and Delete.
+- **Install Vms**: the images the catalog lists, a memory limit, and Install,
+  which asks for the account to make in the VM.
 - **Settings**: JIT, memory, logs, and a UI Preview section that flips the
   stubs.
 
@@ -43,16 +45,46 @@ ANGLE and MoltenVK, each built from upstream source (see
 software. The network is
 user-mode, through [libslirp](https://gitlab.freedesktop.org/slirp/libslirp)
 (BSD-3-Clause) and [GLib](https://gitlab.gnome.org/GNOME/glib) (LGPL-2.1-or-later),
-built from source as dynamic frameworks the app embeds. A VM's files live in
-`Library/Application Support/VMs/<distribution>/` (`vmlinuz`, `initrd.img`,
-`disk.img`); until installs are real they're copied there from a Mac:
+built from source as dynamic frameworks the app embeds.
 
-    xcrun devicectl device copy to --device <udid> --domain-type appDataContainer \
-        --domain-identifier com.amendez.crate --user mobile \
-        --source disk.img --destination "Library/Application Support/VMs/debian/disk.img"
+Above the display's keyboard is a row of the keys an iPhone keyboard lacks:
+Esc, Ctrl, Super, Tab, function keys and arrows, sent as Linux key codes; Ctrl
+and Super hold for the next key, from the row or either keyboard. Take
+Screenshot, in the toolbar's overflow menu, saves the VM's frame at its own
+size to Photos and offers it to share.
 
-`--user mobile` matters: without it crate can't write to the disk. Never add
-`--remove-existing-content`, which empties the app's whole container.
+On iPhone Duo the VM screen's toolbar goes down the side, where iOS puts bars
+there, and drops the title, which would take a strip of height. When the
+keyboard leaves the bar short of room, the display/console switch goes into its
+overflow menu before the keyboard button does. Folded like a laptop, the display or
+console moves above the fold, and the console brings the keyboard up below it.
+Folded like a book, both span the fold. The Simulator can't fold, so crate logs
+the hinge and the fold to `crate.log` for checking on the device.
+
+## Installs
+
+The images come from
+[arm64-desktop-images](https://github.com/oneamendez/arm64-desktop-images),
+whose GitHub workflow builds and attests them: Debian with KDE Plasma, Ubuntu
+with GNOME, Arch Linux ARM with KDE Plasma. Each release has a `catalog.json`
+listing every image's kernel, initrd and disk (xz, in parts under 2 GiB) with
+their SHA-256s, its kernel command line, and its cloud-init vendor-data.
+
+Install reads the latest catalog, downloads an image (crate must stay open
+meanwhile), checks every file, unpacks the disk through Apple's xz decoder as
+its parts arrive (sparsely: empty space takes no room) and grows it to 32 GB.
+The account comes from a seed disk crate writes beside it (`seed.img`, FAT,
+labelled CIDATA): cloud-init's NoCloud user-data with the user, a SHA-512
+crypt of the password, the hostname and time zone, plus the image's
+vendor-data (its desktop's autologin). The seed stays attached read-only, so
+cloud-init sets the VM up once. A VM's files are in
+`Library/Application Support/VMs/<its ID>/`.
+
+A VM can still be put on the iPhone by hand: copy `vmlinuz`, `initrd.img` and
+`disk.img` into its folder with `devicectl device copy to ... --user mobile`
+(without it crate can't write to the disk; never add
+`--remove-existing-content`, which empties the app's whole container). It
+boots with aTerm's command line.
 
 Debug builds can be driven from a Mac the same way: while a VM runs, an empty
 `Library/Caches/debug/screen` gets its display saved as `screen.png` there,
@@ -85,3 +117,16 @@ Launch arguments show one state without tapping to it:
     xcrun simctl launch booted com.amendez.crate --tab=install --jit=on
     # --tab=home|install|settings  --jit=on|off  --empty  --samples
     # --rail: the open Duo's tab column, on any device
+
+With `--jit=on` the Simulator has no code region, so starting a VM pretends: its
+screenshot becomes the display, and the console shows a login prompt that
+echoes typing.
+
+## Known issues
+
+- **A guest can't update its own kernel.** crate boots a VM's kernel and
+  initrd from outside its disk, so the images hold their kernel packages at
+  the version they shipped with. A kernel the guest installs anyway is never
+  booted, and an upgrade can remove the modules the booted kernel needs.
+- **Xfce doesn't follow a new screen size.** On rotate or fold, labwc takes
+  the new size but the Xfce panel and desktop don't (see crate's docs/PLAN.md).

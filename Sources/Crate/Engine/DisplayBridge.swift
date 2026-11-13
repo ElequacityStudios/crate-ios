@@ -65,12 +65,37 @@ final class DisplayBridge: @unchecked Sendable {
         }
     }
 
-    /// The view is `points` big: the guest is offered a desktop of that shape,
-    /// and switches to it if it follows its display's preferred mode, as a
-    /// guest does by default. Rotating or folding the iPhone offers a new one.
+    /// The view is `points` big, in a window `window` big: the guest is offered
+    /// a desktop of the view's shape in landscape, and switches to it if it
+    /// follows its display's preferred mode, as a guest does by default.
+    ///
+    /// In portrait it gets the desktop it had in landscape in a window this
+    /// size, remembered (or, before there's been one, the portrait view's sides
+    /// swapped), so turning the iPhone changes nothing: the desktop sits
+    /// letterboxed. Folding it, a window of another size, offers a new one.
+    ///
+    /// Without a window, `points` is all there is to fill (iPhone Duo folded
+    /// like a laptop, the desktop above the fold): it gets that shape, and
+    /// nothing is remembered, so unfolding brings back the desktop it had.
     @MainActor
-    func fit(_ points: CGSize) {
-        guard let mode = Self.mode(fitting: points) else { return }
+    func fit(_ points: CGSize, window: CGSize?) {
+        let mode: crate_display_mode
+        if let window {
+            let key = "display.landscape.\(Int(max(window.width, window.height)))x\(Int(min(window.width, window.height)))"
+            if points.width >= points.height {
+                guard let fitted = Self.mode(fitting: points) else { return }
+                UserDefaults.standard.set([Int(fitted.width), Int(fitted.height)], forKey: key)
+                mode = fitted
+            } else if let saved = UserDefaults.standard.array(forKey: key) as? [Int], saved.count == 2 {
+                mode = crate_display_mode(width: UInt32(saved[0]), height: UInt32(saved[1]))
+            } else {
+                guard let swapped = Self.mode(fitting: points) else { return }
+                mode = swapped
+            }
+        } else {
+            guard let fitted = Self.mode(fitting: points) else { return }
+            mode = fitted
+        }
         // Rotating or folding lays the view out more than once on the way:
         // only the size it settles on is offered.
         pendingFit?.cancel()
@@ -95,12 +120,14 @@ final class DisplayBridge: @unchecked Sendable {
     /// A guest pixel for each point, so the desktop's text is the size of the
     /// app's, but at least 600 pixels on the short side, where a desktop's
     /// windows start to fit, and at most 2560 on the long one. Multiples of 8.
+    /// Always landscape: a desktop is laid out for it, and in a portrait view
+    /// it sits letterboxed, the same desktop as with the iPhone on its side.
     nonisolated static func mode(fitting points: CGSize) -> crate_display_mode? {
         let short = min(points.width, points.height), long = max(points.width, points.height)
         guard short >= 100 else { return nil }
         let scale = min(max(1, 600 / short), 2560 / long)
         let round8 = { (v: CGFloat) in UInt32(max(8, (v * scale / 8).rounded() * 8)) }
-        return crate_display_mode(width: round8(points.width), height: round8(points.height))
+        return crate_display_mode(width: round8(long), height: round8(short))
     }
 
     /// The fitting size first, then the others.
@@ -125,6 +152,17 @@ final class DisplayBridge: @unchecked Sendable {
 
     func detach() {
         lock.withLock { machine = nil }
+    }
+
+    /// A new boot: forget the last one's screen, so a VM that never shows its
+    /// display isn't taken for one showing another's.
+    func reset() {
+        lock.withLock {
+            pixels?.deallocate()
+            pixels = nil
+            width = 0
+            height = 0
+        }
     }
 
     // MARK: - The view's side, on the main thread
@@ -223,9 +261,24 @@ final class DisplayBridge: @unchecked Sendable {
         if let sink, let image = picture() { sink(image) }
     }
 
-    #if DEBUG
-    /// The screen so far, for DebugHooks.
+    /// The screen so far, at the guest's own size: what a screenshot is of.
     func snapshot() -> CGImage? { picture() }
+
+    #if DEBUG
+    /// Debug builds pretending JIT is on: `image` as the screen, so the
+    /// display can be tried without a VM.
+    func pretend(_ image: CGImage) {
+        lock.withLock {
+            pixels?.deallocate()
+            width = image.width
+            height = image.height
+            pixels = UnsafeMutableRawPointer.allocate(byteCount: width * height * 4, alignment: 16)
+            let context = CGContext(data: pixels, width: width, height: height, bitsPerComponent: 8,
+                                    bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+    }
     #endif
 
     /// The screen so far, as a picture: a copy, so crate can keep drawing.

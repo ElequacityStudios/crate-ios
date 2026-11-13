@@ -23,6 +23,9 @@ final class ConsoleBridge: @unchecked Sendable {
     private var flushScheduled = false
     private var typed: [UInt8] = []
     private var sink: (@MainActor ([UInt8]) -> Void)?
+    #if DEBUG
+    private var pretending = false
+    #endif
 
     /// A boot's worth and more: what a view opened later replays.
     private static let keep = 1 << 20
@@ -93,11 +96,29 @@ final class ConsoleBridge: @unchecked Sendable {
 
     /// What the person typed, for the guest.
     func send(_ bytes: ArraySlice<UInt8>) {
+        #if DEBUG
+        if lock.withLock({ pretending }) {
+            // Return as a new line, delete as rubbing out, the rest as itself.
+            let echo = bytes.flatMap { $0 == 13 ? [13, 10] : $0 == 127 ? [8, 32, 8] : [$0] }
+            echo.withUnsafeBufferPointer { output($0) }
+            return
+        }
+        #endif
         lock.withLock {
             typed.append(contentsOf: bytes)
             writeTyped()
         }
     }
+
+    #if DEBUG
+    /// Debug builds pretending JIT is on: `text` as if the guest printed it,
+    /// and typing echoed from then on, so the terminal can be tried without a
+    /// VM.
+    func pretend(_ text: String) {
+        lock.withLock { pretending = true }
+        Array(text.utf8).withUnsafeBufferPointer { output($0) }
+    }
+    #endif
 
     // MARK: - crate's side, on the guest's threads
 

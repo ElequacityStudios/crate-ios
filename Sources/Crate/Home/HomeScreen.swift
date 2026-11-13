@@ -3,12 +3,14 @@ import SwiftUI
 /// The installed VMs, one large card each, paging vertically.
 struct HomeScreen: View {
     @Environment(MachineStore.self) private var store
+    @Environment(MachineRunner.self) private var runner
 
     let onStart: (Machine) -> Void
     let onInstall: () -> Void
     let onShowJIT: () -> Void
 
     @State private var deleting: Machine?
+    @State private var editing: Machine?
     @Environment(\.dynamicTypeSize) private var typeSize
     /// Each card's height, fixed while scrolling (see fixCardHeight).
     @State private var cardHeight: CGFloat?
@@ -41,9 +43,16 @@ struct HomeScreen: View {
                 titleVisibility: .visible,
                 presenting: deleting
             ) { machine in
-                Button("Delete VM", role: .destructive) { store.delete(machine) }
+                Button("Delete VM", role: .destructive) {
+                    // Not out from under it while it runs.
+                    if runner.machineID == machine.id { runner.stop() }
+                    store.delete(machine)
+                }
             } message: { machine in
                 Text("Its disk (\(Format.bytes(Int64(machine.diskUsedGB * 1e9)))) is removed from this iPhone. This can't be undone.")
+            }
+            .sheet(item: $editing) { machine in
+                MachineSettingsSheet(machine: machine)
             }
         }
     }
@@ -62,9 +71,8 @@ struct HomeScreen: View {
                 ForEach(store.machines) { machine in
                     MachineCard(
                         machine: machine,
-                        isDefault: store.isDefault(machine),
                         onStart: { onStart(machine) },
-                        onToggleDefault: { store.toggleDefault(machine) },
+                        onEditSettings: { editing = machine },
                         onDelete: { deleting = machine })
                     // At the accessibility text sizes a card grows to fit its text.
                     .frame(height: typeSize.isAccessibilitySize ? nil : cardHeight)

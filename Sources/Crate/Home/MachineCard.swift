@@ -6,12 +6,13 @@ import SwiftUI
 /// tall (landscape, or the Duo opened flat) puts them side by side.
 struct MachineCard: View {
     let machine: Machine
-    let isDefault: Bool
     let onStart: () -> Void
-    let onToggleDefault: () -> Void
+    let onEditSettings: () -> Void
     let onDelete: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// The only setting so far is iPhone Duo's.
+    @Environment(\.hasHinge) private var hasHinge
 
     var body: some View {
         Group {
@@ -37,7 +38,6 @@ struct MachineCard: View {
 
     private var screenshot: some View {
         MachineScreenshot(machine: machine)
-            .overlay(alignment: .topTrailing) { starButton.padding(10) }
     }
 
     /// The card at the size HomeScreen gives it.
@@ -138,11 +138,8 @@ struct MachineCard: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(isDefault ? "Remove as Default" : "Make Default",
-                   systemImage: isDefault ? "star.slash" : "star",
-                   action: onToggleDefault)
-            Button("Edit Settings…", systemImage: "slider.horizontal.3") {}
-                .disabled(true)
+            Button("Edit Settings…", systemImage: "slider.horizontal.3", action: onEditSettings)
+                .disabled(!hasHinge)
             Divider()
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         } label: {
@@ -160,36 +157,14 @@ struct MachineCard: View {
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityLabel("More")
     }
-
-    /// The star: filled and labelled on the default VM, a plain outline otherwise.
-    ///
-    /// It sits on the screenshot, which is content, so it uses a standard
-    /// material rather than Liquid Glass; dark, so it reads the same over any
-    /// screenshot in either appearance.
-    private var starButton: some View {
-        Button(action: onToggleDefault) {
-            HStack(spacing: 5) {
-                Image(systemName: isDefault ? "star.fill" : "star")
-                    .foregroundStyle(isDefault ? AnyShapeStyle(.yellow) : AnyShapeStyle(.primary))
-                if isDefault {
-                    Text("Default")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, isDefault ? 14 : 0)
-            .frame(minWidth: 44, minHeight: 44)
-            .background(.ultraThinMaterial, in: Capsule())
-            .environment(\.colorScheme, .dark)
-        }
-        .buttonStyle(.plain)
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityLabel(isDefault ? "Default VM. Remove as default" : "Make default")
-    }
 }
 
 /// The VM's last screen, or a stand-in before it has one.
 struct MachineScreenshot: View {
     let machine: Machine
+
+    /// Its screen as it was last stopped (MachinePreview), once there is one.
+    @State private var preview: UIImage?
 
     var body: some View {
         // The colour sets the size and the image fills it, so a screenshot of any
@@ -197,7 +172,11 @@ struct MachineScreenshot: View {
         Rectangle()
             .fill(machine.distribution.color.gradient.opacity(0.35))
             .overlay {
-                if let name = machine.screenshot {
+                if let preview {
+                    Image(uiImage: preview)
+                        .resizable()
+                        .scaledToFill()
+                } else if let name = machine.screenshot {
                     Image(name)
                         .resizable()
                         .scaledToFill()
@@ -214,6 +193,11 @@ struct MachineScreenshot: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .accessibilityLabel("\(machine.name) screenshot")
+            // Again each time a stop saves a new one.
+            .task(id: machine.previewDate) {
+                guard machine.previewDate != nil else { return }
+                preview = await MachinePreview.load(GuestFiles(for: machine).preview)
+            }
     }
 }
 

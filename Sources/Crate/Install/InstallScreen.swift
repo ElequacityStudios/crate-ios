@@ -1,48 +1,58 @@
 import SwiftUI
 
-/// Pick a system image and a memory limit, then install it.
+/// Pick a system image from the catalog and a memory limit, give the account
+/// to make in it, then install it.
 struct InstallScreen: View {
     @Environment(MachineStore.self) private var store
+    @Environment(Installer.self) private var installer
     @Environment(\.dynamicTypeSize) private var typeSize
 
     let onShowHome: () -> Void
 
-    @State private var selectedID = CatalogImage.catalog[0].id
+    @State private var catalog = CatalogState.loading
+    @State private var selectedID: String?
     @AppStorage(SettingsKey.installMemoryGB) private var memoryGB = 6
-    @State private var install = InstallProgress.idle
-    @State private var installTask: Task<Void, Never>?
+    @State private var askingForAccount = false
     @State private var confirmingCancel = false
 
     private let memoryChoices = [4, 6, 8]
+    /// The disk every VM gets: a sparse file, so it takes only what the guest
+    /// writes.
+    private let diskGB = 32
 
-    private var selected: CatalogImage {
-        CatalogImage.catalog.first { $0.id == selectedID } ?? CatalogImage.catalog[0]
+    enum CatalogState {
+        case loading
+        case loaded([CatalogImage])
+        case failed(String)
+    }
+
+    private var images: [CatalogImage] {
+        if case .loaded(let images) = catalog { return images }
+        return []
+    }
+
+    private var selected: CatalogImage? {
+        images.first { $0.id == selectedID } ?? images.first
     }
 
     /// Nil when iOS doesn't say, in which case Install stays available.
     private var freeBytes: Int64? { Format.freeDiskBytes() }
 
+    /// The disk as unpacked, and one part of the download beside it.
+    private func neededBytes(_ image: CatalogImage) -> Int64 {
+        image.installedBytes + (image.disk.parts.map(\.size).max() ?? 0)
+    }
+
     private var hasRoom: Bool {
-        freeBytes.map { $0 >= selected.installedBytes } ?? true
+        guard let selected else { return false }
+        return freeBytes.map { $0 >= neededBytes(selected) } ?? true
     }
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(CatalogImage.catalog) { image in
-                        CatalogRow(
-                            image: image,
-                            isSelected: image.id == selectedID,
-                            isInstalled: store.isInstalled(image)
-                        ) {
-                            selectedID = image.id
-                        }
-                    }
-                } header: {
-                    Text("Linux")
-                }
-                .disabled(install.isBusy)
+                imagesSection
+                    .disabled(installer.isBusy)
 
                 Section {
                     Picker("Memory limit", selection: $memoryGB) {
@@ -58,7 +68,7 @@ struct InstallScreen: View {
                 } footer: {
                     Text(memoryFooter)
                 }
-                .disabled(install.isBusy)
+                .disabled(installer.isBusy)
 
                 // At the accessibility text sizes a pinned bar would cover half
                 // the screen, so Install scrolls with the list instead.
@@ -72,7 +82,7 @@ struct InstallScreen: View {
             }
             .navigationTitle("Install Vms")
             .safeAreaInset(edge: .bottom) {
-                if !typeSize.isAccessibilitySize {
+                if !typeSize.isAccessibilitySize, selected != nil || installer.phase != .idle {
                     installControls
                         .padding(.horizontal, 20)
                         .padding(.top, 14)
@@ -80,16 +90,71 @@ struct InstallScreen: View {
                         .background(.bar)
                 }
             }
+            .task { await loadCatalog() }
+            .refreshable { await loadCatalog() }
             .onChange(of: selectedID) {
                 // A finished install belongs to the image it was for.
-                if case .done = install { install = .idle }
+                if case .done = installer.phase { installer.reset() }
             }
-            .alert(install.cancelTitle(for: selected), isPresented: $confirmingCancel) {
-                Button(install.cancelButton, role: .destructive, action: cancel)
-                Button("Cancel", role: .cancel) {}
+            .sheet(isPresented: $askingForAccount) {
+                if let selected {
+                    AccountSheet(image: selected) { owner in
+                        askingForAccount = false
+                        installer.install(selected, memoryGB: memoryGB, diskGB: diskGB, owner: owner, into: store)
+                    }
+                }
+            }
+            .alert(cancelTitle, isPresented: $confirmingCancel) {
+                Button("Stop Installing", role: .destructive) { installer.cancel() }
+                Button("Keep Installing", role: .cancel) {}
             } message: {
-                Text(install.cancelMessage(for: selected))
+                Text("What's downloaded so far is discarded.")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var imagesSection: some View {
+        Section {
+            switch catalog {
+            case .loading:
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            case .failed(let message):
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(message)
+                        .foregroundStyle(.secondary)
+                    Button("Try Again") { Task { await loadCatalog() } }
+                }
+                .padding(.vertical, 4)
+            case .loaded(let images):
+                ForEach(images) { image in
+                    CatalogRow(
+                        image: image,
+                        isSelected: image.id == selected?.id,
+                        isInstalled: store.isInstalled(image)
+                    ) {
+                        selectedID = image.id
+                    }
+                }
+            }
+        } header: {
+            Text("Linux")
+        }
+    }
+
+    private func loadCatalog() async {
+        if case .loaded = catalog {} else { catalog = .loading }
+        do {
+            let fetched = try await Catalog.fetch()
+            catalog = .loaded(fetched.images)
+        } catch {
+            if case .loaded = catalog { return }
+            catalog = .failed(error.localizedDescription)
         }
     }
 
@@ -101,163 +166,212 @@ struct InstallScreen: View {
         return text
     }
 
+    private var cancelTitle: String {
+        "Stop Installing \(installer.image?.name ?? "")?"
+    }
+
     // MARK: - Install controls
 
     @ViewBuilder
     private var installControls: some View {
         VStack(spacing: 8) {
-            switch install {
+            switch installer.phase {
             case .idle:
-                Button(action: start) {
-                    Label("Install \(selected.name)", systemImage: "arrow.down.circle.fill")
-                        .font(.title3.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .disabled(!hasRoom)
-                Text(spaceNeeded)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            case .downloading(let fraction), .installing(let fraction):
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(install.title(for: selected))
-                            .font(.headline)
-                        Spacer()
-                        Button("Cancel") { confirmingCancel = true }
+                if let selected {
+                    Button {
+                        askingForAccount = true
+                    } label: {
+                        Label("Install \(selected.name)", systemImage: "arrow.down.circle.fill")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
                     }
-                    ProgressView(value: fraction)
-                    Text(install.detail(for: selected))
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+                    .disabled(!hasRoom)
+                    Text(spaceNeeded(selected))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .monospacedDigit()
+                        .multilineTextAlignment(.center)
                 }
-            case .done(let image):
+            case .downloading(let done, let total):
+                progress(title: "Downloading \(installer.image?.name ?? "")…",
+                         value: total > 0 ? Double(done) / Double(total) : 0,
+                         detail: "\(Format.bytes(done)) of \(Format.bytes(total)) · Keep crate open until it's done.",
+                         cancellable: true)
+            case .unpacking(let done, let total):
+                progress(title: "Unpacking \(installer.image?.name ?? "")…",
+                         value: total > 0 ? Double(done) / Double(total) : 0,
+                         detail: "\(Format.bytes(done)) of \(Format.bytes(total)) · Keep crate open until it's done.",
+                         cancellable: true)
+            case .finishing:
+                progress(title: "Installing \(installer.image?.name ?? "")…", value: nil,
+                         detail: "Checking the disk and setting up your account", cancellable: false)
+            case .done(let machine):
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title)
                         .foregroundStyle(.green)
                     VStack(alignment: .leading) {
-                        Text("\(image.name) is installed")
+                        Text("\(machine.name) is installed")
                             .font(.headline)
-                        Text("It's on Home, ready to start.")
+                        Text("Its first start sets up your account.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button("Go to Home") {
-                        install = .idle
+                        installer.reset()
                         onShowHome()
                     }
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
                 }
+            case .failed(let message):
+                HStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title)
+                        .foregroundStyle(.orange)
+                    Text(message)
+                        .font(.subheadline)
+                    Spacer()
+                    Button("OK") { installer.reset() }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                }
             }
         }
     }
 
-    private var spaceNeeded: String {
+    private func progress(title: String, value: Double?, detail: String, cancellable: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                if cancellable {
+                    Button("Cancel") { confirmingCancel = true }
+                }
+            }
+            if let value {
+                ProgressView(value: value)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private func spaceNeeded(_ image: CatalogImage) -> String {
+        let needed = neededBytes(image)
         guard let free = freeBytes else {
-            return "Needs \(Format.bytes(selected.installedBytes)) of storage"
+            return "Downloads \(Format.bytes(image.downloadBytes)) · needs \(Format.bytes(needed)) of storage"
         }
-        if !hasRoom {
-            return "Free up \(Format.bytes(selected.installedBytes - free)) to install \(selected.name)."
+        if free < needed {
+            return "Free up \(Format.bytes(needed - free)) to install \(image.name)."
         }
-        return "Needs \(Format.bytes(selected.installedBytes)) of storage · \(Format.bytes(free)) available"
-    }
-
-    // MARK: - Fake install
-
-    /// STUB: walks a progress bar over a few seconds, then adds the VM to Home.
-    private func start() {
-        let image = selected
-        let memory = memoryGB
-        installTask = Task {
-            for step in 0...40 {
-                install = .downloading(Double(step) / 40)
-                try? await Task.sleep(for: .milliseconds(90))
-                if Task.isCancelled { return }
-            }
-            for step in 0...10 {
-                install = .installing(Double(step) / 10)
-                try? await Task.sleep(for: .milliseconds(120))
-                if Task.isCancelled { return }
-            }
-            store.add(image.machine(memoryGB: memory))
-            // Finished while "Stop Download?" was up: nothing left to stop.
-            confirmingCancel = false
-            withAnimation { install = .done(image) }
-        }
-    }
-
-    private func cancel() {
-        installTask?.cancel()
-        installTask = nil
-        install = .idle
+        return "Downloads \(Format.bytes(image.downloadBytes)) · needs \(Format.bytes(needed)) · \(Format.bytes(free)) available"
     }
 }
 
-/// Where a fake install has got to.
-enum InstallProgress: Equatable {
-    case idle
-    case downloading(Double)
-    case installing(Double)
-    case done(CatalogImage)
+/// The account to make in the VM, asked for before installing: the user name
+/// and password to sign in with, and the computer's name.
+struct AccountSheet: View {
+    let image: CatalogImage
+    let onInstall: (SeedDisk) -> Void
 
-    var isBusy: Bool {
-        switch self {
-        case .downloading, .installing: true
-        case .idle, .done: false
+    @Environment(\.dismiss) private var dismiss
+    @State private var user = ""
+    @State private var password = ""
+    @State private var hostname = ""
+    /// The password in the clear: with no second field to type it again in,
+    /// it's how a typo gets caught.
+    @State private var showsPassword = false
+    @FocusState private var passwordFocused: Bool
+
+    private var userValid: Bool { SeedDisk.isValid(user: user) }
+    private var hostnameValid: Bool { SeedDisk.isValid(hostname: hostname) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("User Name", text: $user)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    passwordField(shown: showsPassword)
+                } header: {
+                    Text("Your Account")
+                } footer: {
+                    if !user.isEmpty && !userValid {
+                        Text("Lowercase letters, numbers, \"-\" and \"_\", starting with a letter.")
+                    } else {
+                        Text("What you sign in to \(image.name) with. crate keeps only a hash of the password.")
+                    }
+                }
+                Section {
+                    TextField("Computer Name", text: $hostname)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } footer: {
+                    if !hostname.isEmpty && !hostnameValid {
+                        Text("Lowercase letters, numbers and \"-\".")
+                    } else {
+                        Text("The name \(image.name) goes by on the network.")
+                    }
+                }
+            }
+            .navigationTitle("Install \(image.name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Install") {
+                        onInstall(SeedDisk(user: user, password: password, hostname: hostname,
+                                           timeZone: TimeZone.current.identifier,
+                                           vendorData: image.vendorData))
+                    }
+                    .disabled(!userValid || password.isEmpty || !hostnameValid)
+                }
+            }
+            .onAppear {
+                if hostname.isEmpty { hostname = image.distributionID }
+            }
         }
     }
 
-    func title(for image: CatalogImage) -> String {
-        switch self {
-        case .downloading: "Downloading \(image.name)…"
-        case .installing: "Installing \(image.name)…"
-        case .idle, .done: ""
-        }
-    }
-
-    func detail(for image: CatalogImage) -> String {
-        switch self {
-        case .downloading(let fraction):
-            let done = Int64(Double(image.downloadBytes) * fraction)
-            return "\(Format.bytes(done)) of \(Format.bytes(image.downloadBytes))"
-        case .installing:
-            return "Unpacking the disk image"
-        case .idle, .done:
-            return ""
-        }
-    }
-
-    // Cancelling throws the download away, so it's confirmed first.
-
-    func cancelTitle(for image: CatalogImage) -> String {
-        switch self {
-        case .installing: "Stop Installing \(image.name)?"
-        default: "Stop Downloading \(image.name)?"
-        }
-    }
-
-    var cancelButton: String {
-        switch self {
-        case .installing: "Stop Installing"
-        default: "Stop Download"
-        }
-    }
-
-    func cancelMessage(for image: CatalogImage) -> String {
-        switch self {
-        case .downloading(let fraction):
-            let done = Int64(Double(image.downloadBytes) * fraction)
-            return "The \(Format.bytes(done)) downloaded so far is discarded."
-        default:
-            return "The download is discarded, and starts over next time."
+    /// The password field, and the eye that shows or hides what's in it.
+    /// Swapping the field drops the keyboard, so focus is put back.
+    private func passwordField(shown: Bool) -> some View {
+        HStack {
+            Group {
+                if shown {
+                    TextField("Password", text: $password)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } else {
+                    SecureField("Password", text: $password)
+                }
+            }
+            .textContentType(.newPassword)
+            .focused($passwordFocused)
+            Button(shown ? "Hide Password" : "Show Password",
+                   systemImage: shown ? "eye.slash" : "eye") {
+                let wasFocused = passwordFocused
+                showsPassword.toggle()
+                if wasFocused { DispatchQueue.main.async { passwordFocused = true } }
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -310,7 +424,7 @@ struct CatalogRow: View {
         }
     }
 
-    /// "Xfce · 1.5 GB", and "· Installed" once there's a copy on Home.
+    /// "KDE Plasma · 1.5 GB", and "· Installed" once there's a copy on Home.
     private var details: String {
         var parts = [image.desktop, Format.bytes(image.downloadBytes)]
         if isInstalled { parts.append("Installed") }

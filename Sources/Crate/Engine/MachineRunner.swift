@@ -77,6 +77,7 @@ final class MachineRunner {
         phase = .starting
         machineID = vm.id
         console.reset()
+        display.reset()
         let settings = Settings(vm: vm, files: files, display: display)
         AppLog.write("vm: starting \(vm.name): \(settings.cpus) CPUs, \(settings.memoryMiB) MiB, "
                      + "code \(region.size >> 20) MiB; \(settings.commandLine)")
@@ -126,6 +127,8 @@ final class MachineRunner {
         let kernel: String
         let initrd: String
         let disk: String
+        /// The first-boot settings, when the VM was installed with them.
+        let seed: String?
         let commandLine: String
         let displayModes: [crate_display_mode]
 
@@ -136,7 +139,8 @@ final class MachineRunner {
             kernel = files.kernel.path
             initrd = files.initrd.path
             disk = files.disk.path
-            commandLine = Self.commandLine
+            seed = FileManager.default.fileExists(atPath: files.seed.path) ? files.seed.path : nil
+            commandLine = vm.cmdline ?? Self.commandLine
             displayModes = display.modes(after: Self.modes(preferring: vm.display))
         }
 
@@ -168,10 +172,12 @@ final class MachineRunner {
             return min(asked, fits)
         }
 
-        /// Serial console, the disk as the root, and the desktop pulled in at
-        /// boot (the image doesn't enable it). multi-user rather than the image's
-        /// graphical target, which starts nothing the desktop service doesn't;
-        /// no getty on tty1, which the desktop takes.
+        /// For a VM put on the iPhone by hand from aTerm's image, which has no
+        /// command line of its own: serial console, the disk as the root, and
+        /// the desktop pulled in at boot (the image doesn't enable it).
+        /// multi-user rather than the image's graphical target, which starts
+        /// nothing the desktop service doesn't; no getty on tty1, which the
+        /// desktop takes. An installed VM boots with its image's.
         static let commandLine = ([
             "console=ttyAMA0", "root=/dev/vda", "rw", "net.ifnames=0",
             "vt.global_cursor_default=0", "systemd.unit=multi-user.target",
@@ -216,6 +222,10 @@ final class MachineRunner {
             { check(crate_config_set_initrd(config, settings.initrd), "the initrd") },
             { check(crate_config_set_cmdline(config, settings.commandLine), "the kernel command line") },
             { check(crate_config_add_disk(config, settings.disk, 0), "the disk") },
+            {
+                guard let seed = settings.seed else { return nil }
+                return check(crate_config_add_disk(config, seed, CRATE_DISK_READ_ONLY), "the first-boot settings")
+            },
             {
                 var network: UInt32 = 0
                 return check(crate_config_add_network(config, &network), "the network")
@@ -267,6 +277,14 @@ final class MachineRunner {
         #endif
         console.detach()
         display.detach()
+        // Its memory goes back now rather than when the next VM starts: the
+        // guest's RAM counts against crate's limit, which an install
+        // meanwhile needs.
+        if let machine {
+            crate_machine_free(machine)
+            self.machine = nil
+            AppLog.write("vm: freed, footprint \(MemoryReport().footprint >> 20) MiB")
+        }
         phase = reason == CRATE_STOP_ERROR ? .failed(text) : .stopped(text)
     }
 }

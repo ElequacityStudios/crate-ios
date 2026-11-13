@@ -26,7 +26,6 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 /// The three tabs, and the running VM over them.
 struct RootView: View {
-    @Environment(MachineStore.self) private var store
     @Environment(JITSession.self) private var jit
     @AppStorage(SettingsKey.jitAtLaunch) private var jitAtLaunch = true
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
@@ -35,9 +34,6 @@ struct RootView: View {
     @SceneStorage("tab") private var tab = AppTab.home
     @State private var running: Machine?
     @State private var didLaunch = false
-    /// Set while the launch's own attempt to turn JIT on is under way, so the
-    /// default VM boots if it works.
-    @State private var bootWhenJITTurnsOn = false
     @State private var fold = FoldSignals()
     /// A tab to open on regardless, from a launch argument.
     private let launchTab: AppTab?
@@ -64,6 +60,7 @@ struct RootView: View {
             }
         }
         .readFoldSignals($fold)
+        .environment(\.hasHinge, fold.hasHinge)
         .fullScreenCover(item: $running) { machine in
             MachineScreen(machine: machine)
         }
@@ -74,12 +71,6 @@ struct RootView: View {
         }
         .task { openLaunchTab() }
         .onChange(of: jit.state, initial: true) { launchSettled() }
-        .onChange(of: jit.isOn) {
-            if jit.isOn && bootWhenJITTurnsOn { bootDefault() }
-        }
-        .onChange(of: jit.isTurningOn) {
-            if !jit.isTurningOn && !jit.isOn { bootWhenJITTurnsOn = false }
-        }
     }
 
     private var tabs: some View {
@@ -106,27 +97,19 @@ struct RootView: View {
         if let launchTab { tab = launchTab }
     }
 
-    /// The default VM boots at launch, but only when JIT is on: without it a
-    /// VM can't run, so the app stays on Home instead. Decided once, when the
-    /// launch's JIT check settles. With nothing attached and "Turn on JIT when
-    /// crate opens" set, it turns JIT on first, and boots if that works.
+    /// With nothing attached and "Turn on JIT when crate opens" set, JIT goes
+    /// on at launch, once the launch's own check settles. No VM starts by
+    /// itself: that's left to Start.
     private func launchSettled() {
         guard !didLaunch, jit.state != .checking else { return }
         didLaunch = true
-        if jit.isOn {
-            bootDefault()
-        } else if jit.state == .off(.noDebugger), jitAtLaunch {
-            bootWhenJITTurnsOn = true
+        if !jit.isOn, jit.state == .off(.noDebugger), jitAtLaunch {
             Task { await jit.turnOn(JITMethod(rawValue: jitMethod) ?? .standard, interactive: false) }
         }
     }
+}
 
-    private func bootDefault() {
-        bootWhenJITTurnsOn = false
-        guard running == nil, let machine = store.defaultMachine else { return }
-        // Already there, rather than sliding up over Home.
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) { running = machine }
-    }
+extension EnvironmentValues {
+    /// iPhone Duo: what only applies to its hinge, folds and side bars shows.
+    @Entry var hasHinge = false
 }

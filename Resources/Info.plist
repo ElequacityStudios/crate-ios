@@ -47,6 +47,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>crate looks for this iPhone's Remote Pairing service to turn on JIT.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>crate saves screenshots of your VMs to Photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
