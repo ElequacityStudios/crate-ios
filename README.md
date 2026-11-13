@@ -1,4 +1,4 @@
-# Crate
+# crate
 
 An iOS app that runs Linux VMs on the crate engine. This is the UI only, so
 far: VMs, installs and JIT are sample data and stubs (search the code for

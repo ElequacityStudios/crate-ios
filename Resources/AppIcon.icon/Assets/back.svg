@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The open top: the dark inside, the back wall's top plank, and the tops of
+       the two side walls slanting forward to the front corners. -->
+  <path d="M206 420 H818 L876 620 H148 Z" fill="#6B3F1D"/>
+  <rect x="206" y="420" width="612" height="54" rx="20" fill="#A8693A"/>
+  <path d="M206 420 H250 L232 560 H148 Z" fill="#C08447"/>
+  <path d="M774 420 H818 L876 560 H792 Z" fill="#C08447"/>
+</svg>

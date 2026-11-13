@@ -20,7 +20,7 @@ targets:
     info:
       path: Resources/Info.plist
       properties:
-        CFBundleDisplayName: Crate
+        CFBundleDisplayName: crate
         CFBundleShortVersionString: "0.1"
         CFBundleVersion: "1"
         # The system's grouped background, as Home's, so launch doesn't flash

@@ -61,7 +61,7 @@ struct SettingsScreen: View {
                 }
             }
             .pickerStyle(.menu)
-            Toggle("Turn on JIT when Crate opens", isOn: $jitAtLaunch)
+            Toggle("Turn on JIT when crate opens", isOn: $jitAtLaunch)
             Picker("Code region", selection: $codeRegionMB) {
                 ForEach(CodeRegion.choices, id: \.self) { mb in
                     Text("\(mb) MB").tag(mb)
@@ -71,7 +71,7 @@ struct SettingsScreen: View {
         } header: {
             Text("JIT")
         } footer: {
-            Text("Crate needs JIT to run a VM. The code region is the memory set aside for translated code, claimed once per launch, so a change applies the next time Crate opens.")
+            Text("crate needs JIT to run a VM. The code region is the memory set aside for translated code, claimed once per launch, so a change applies the next time crate opens.")
         }
     }
 
@@ -81,11 +81,11 @@ struct SettingsScreen: View {
         Section {
             LabeledContent("Increased memory limit",
                            value: memory.hasIncreasedLimit ? "Yes" : "No")
-            LabeledContent("Most Crate can claim") {
+            LabeledContent("Most crate can claim") {
                 Text(memory.limit.map(Format.memory) ?? "Not reported")
                     .monospacedDigit()
             }
-            LabeledContent("Free for Crate now") {
+            LabeledContent("Free for crate now") {
                 Text(memory.available.map(Format.memory) ?? "Not reported")
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -105,7 +105,7 @@ struct SettingsScreen: View {
         if memory.available == nil {
             return "The Simulator has no memory limit, so iOS reports nothing here. On an iPhone these come from iOS and update every few seconds."
         }
-        return "A VM's memory comes out of what Crate can claim. iOS sets that limit; the increased-memory-limit entitlement raises it."
+        return "A VM's memory comes out of what crate can claim. iOS sets that limit; the increased-memory-limit entitlement raises it."
     }
 
     /// Re-reads the figures every few seconds while Settings is on screen.
@@ -128,7 +128,7 @@ struct SettingsScreen: View {
         } header: {
             Text("Logs")
         } footer: {
-            Text("Shares a file with what Crate and the VM engine logged this launch, for a bug report.")
+            Text("Shares a file with what crate and the VM engine logged this launch, for a bug report.")
         }
     }
 
@@ -150,7 +150,7 @@ struct SettingsScreen: View {
         } header: {
             Text("UI Preview")
         } footer: {
-            Text("Stand-ins for parts that aren't wired in yet. Relaunch Crate with JIT on to see the default VM boot.")
+            Text("Stand-ins for parts that aren't wired in yet. Relaunch crate with JIT on to see the default VM boot.")
         }
     }
 

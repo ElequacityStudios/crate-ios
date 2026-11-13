@@ -11,7 +11,7 @@ enum LogExport {
             .appendingPathComponent("crate-\(stamp).log")
         let memory = MemoryReport()
         let lines = [
-            "Crate \(appVersion) -- sample log (no engine wired in yet)",
+            "crate \(appVersion) -- sample log (no engine wired in yet)",
             "date: \(Date.now.formatted(.iso8601))",
             "device: \(deviceModel), iOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
             "memory: physical \(Format.memory(memory.physical)), "

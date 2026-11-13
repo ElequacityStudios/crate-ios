@@ -80,7 +80,7 @@ struct MachineScreen: View {
                     .foregroundStyle(.yellow)
                 Text("JIT Is Off")
                     .font(.title2.bold())
-                Text("Crate needs JIT to run \(machine.name). Turn it on, then the VM starts.")
+                Text("crate needs JIT to run \(machine.name). Turn it on, then the VM starts.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                 Button {

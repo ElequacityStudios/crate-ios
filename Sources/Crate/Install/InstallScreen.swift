@@ -96,7 +96,7 @@ struct InstallScreen: View {
     private var memoryFooter: String {
         var text = "The most memory the VM may use. You can change it later."
         if let limit = MemoryReport().limit, UInt64(memoryGB) << 30 > limit {
-            text += " Crate can only claim \(Format.memory(limit)) on this iPhone, so the VM gets less."
+            text += " crate can only claim \(Format.memory(limit)) on this iPhone, so the VM gets less."
         }
         return text
     }

@@ -32,8 +32,9 @@ enum SettingsKey {
 }
 
 /// Sizes offered for the JIT code region, in MB. It is claimed once per launch,
-/// so a change applies the next time Crate opens.
+/// so a change applies the next time crate opens. The default is the largest:
+/// more room for translated code means less retranslating.
 enum CodeRegion {
     static let choices = [128, 256, 384, 512, 768, 1024]
-    static let standard = 384
+    static let standard = 1024
 }
