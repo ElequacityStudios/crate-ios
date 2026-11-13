@@ -22,8 +22,8 @@
     {
       "layers": [
         {
-          "image-name": "rack.svg",
-          "name": "rack"
+          "image-name": "prompt.svg",
+          "name": "prompt"
         }
       ],
       "shadow": {
