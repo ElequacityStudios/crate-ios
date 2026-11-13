@@ -26,12 +26,12 @@ struct MachineCard: View {
                     // too short for the whole grid; it then shrinks to one row,
                     // and failing that to one line of figures.
                     ViewThatFits(in: .vertical) {
-                        details(specs: MachineSpecs(machine: machine))
-                        details(specs: MachineSpecs(machine: machine, rows: 1))
-                        details(specs: MachineSpecLine(machine: machine))
+                        details(specs: MachineSpecs(machine: machine), wide: true)
+                        details(specs: MachineSpecs(machine: machine, rows: 1), wide: true)
+                        details(specs: MachineSpecLine(machine: machine), wide: true)
                     }
                 } else {
-                    details(specs: MachineSpecs(machine: machine))
+                    details(specs: MachineSpecs(machine: machine), wide: false)
                 }
             }
             .padding(14)
@@ -41,11 +41,15 @@ struct MachineCard: View {
         .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
     }
 
-    private func details(specs: some View) -> some View {
+    /// Side by side, Start sits at the bottom of the details column; stacked,
+    /// the screenshot above takes all the spare height instead.
+    private func details(specs: some View, wide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             specs
-            Spacer(minLength: 0)
+            if wide {
+                Spacer(minLength: 0)
+            }
             Button(action: onStart) {
                 Label("Start", systemImage: "play.fill")
                     .font(.title3.weight(.semibold))

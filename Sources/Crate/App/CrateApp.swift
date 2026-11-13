@@ -3,21 +3,20 @@ import SwiftUI
 @main
 struct CrateApp: App {
     @State private var store: MachineStore
-    private let firstTab: AppTab
+    private let options: LaunchOptions
 
     init() {
-        let options = LaunchOptions.parse(ProcessInfo.processInfo.arguments)
+        options = LaunchOptions.parse(ProcessInfo.processInfo.arguments)
         options.applyToDefaults()
         let store = MachineStore()
         if options.empty { store.removeAll() }
         if options.samples { store.restoreSamples() }
         _store = State(initialValue: store)
-        firstTab = options.tab ?? .home
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView(firstTab: firstTab)
+            RootView(firstTab: options.tab ?? .home, forceRail: options.rail)
                 .environment(store)
         }
     }
@@ -30,6 +29,8 @@ struct LaunchOptions {
     var jit: Bool?
     var empty = false
     var samples = false
+    /// The open Duo's tab column, on any device.
+    var rail = false
 
     static func parse(_ arguments: [String]) -> LaunchOptions {
         var options = LaunchOptions()
@@ -42,6 +43,7 @@ struct LaunchOptions {
             case "--jit=off": options.jit = false
             case "--empty": options.empty = true
             case "--samples": options.samples = true
+            case "--rail": options.rail = true
             default: break
             }
         }

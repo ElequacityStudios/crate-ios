@@ -26,3 +26,4 @@ Launch arguments show one state without tapping to it:
 
     xcrun simctl launch booted com.amendez.crate --tab=install --jit=on
     # --tab=home|install|settings  --jit=on|off  --empty  --samples
+    # --rail: the open Duo's tab column, on any device
