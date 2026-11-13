@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The macOS window, left. -->
+  <g transform="translate(150 290) rotate(-9 150 135)">
+    <rect width="300" height="270" rx="32" fill="#3A3A3C"/>
+    <path d="M0 66 H300 V238 Q300 270 268 270 H32 Q0 270 0 238 Z" fill="#F5F5F7"/>
+    <circle cx="43" cy="33" r="20" fill="#FF5F57" stroke="#B3261E" stroke-opacity="0.45" stroke-width="3"/>
+    <circle cx="93" cy="33" r="20" fill="#FEBC2E" stroke="#B3261E" stroke-opacity="0.45" stroke-width="3"/>
+    <circle cx="143" cy="33" r="20" fill="#28C840" stroke="#B3261E" stroke-opacity="0.45" stroke-width="3"/>
+    <rect x="28" y="100" width="150" height="24" rx="12" fill="#C7C7CC"/>
+    <rect x="28" y="142" width="200" height="24" rx="12" fill="#C7C7CC"/>
+    <rect x="28" y="184" width="120" height="24" rx="12" fill="#C7C7CC"/>
+  </g>
+</svg>
