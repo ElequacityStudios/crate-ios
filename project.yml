@@ -35,6 +35,34 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
+        # Built-in StikJIT's pairing file lives in Documents/StikJIT, where
+        # idevice_pair and Finder can put it as well as Settings' importer.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        # The JIT helper finds the iPhone's Remote Pairing service over Bonjour
+        # when LocalDevVPN's usual address doesn't answer.
+        NSLocalNetworkUsageDescription: crate looks for this iPhone's Remote Pairing service to turn on JIT.
+        # ...and pairs this iPhone with crate by advertising as a computer.
+        NSBonjourServices:
+          - _remotepairing._tcp
+          - _remotepairing-pairable-host._tcp
+        LSApplicationQueriesSchemes:
+          - stikdebug
+          - localdevvpn
+        # LocalDevVPN comes back to crate:// once it has connected.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.amendez.crate
+            CFBundleURLSchemes:
+              - crate
+        # Picture in Picture, which floats the pairing code over Settings and
+        # keeps crate running while the person types it there.
+        UIBackgroundModes:
+          - audio
+    dependencies:
+      - target: CrateJITHelper
+      # idevice, built from source by Scripts/build-idevice.sh: pairing on the iPhone.
+      - framework: Frameworks/IDevice.xcframework
+        embed: false
     entitlements:
       path: Resources/Crate.entitlements
       properties:
@@ -52,6 +80,8 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The code region is claimed in C (a `brk` with arguments in x0 and x1).
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Crate/JIT/Crate-Bridging-Header.h
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         TARGETED_DEVICE_FAMILY: "1,2"
 
@@ -59,3 +89,61 @@ targets:
         # to the simulator SDK: unscoped, it produces an app a device refuses.
         CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: NO
         CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]: NO
+        # idevice is built for Apple silicon Simulators only.
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+
+  # Built-in StikJIT: the second process that attaches a debugger to crate (see
+  # CrateJITHelper.swift). StikJIT has no Simulator slice, so it's linked and
+  # embedded in device builds only, and the helper compiles without it there.
+  CrateJITHelper:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/JITHelper
+    info:
+      path: Resources/JITHelper-Info.plist
+      properties:
+        CFBundleDisplayName: crate JIT helper
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        NSExtension:
+          # Apple's AR viewer point, with a rule nothing matches: no app or
+          # share sheet ever offers it, and crate starts it by bundle ID.
+          NSExtensionPointIdentifier: com.apple.ar.viewer
+          NSExtensionPrincipalClass: CrateJITHelper
+          NSExtensionAttributes:
+            NSExtensionActivationRule: FALSEPREDICATE
+        # An app-type process per request, not a plain XPC service.
+        XPCService:
+          ServiceType: Application
+          _MultipleInstances: true
+          _ProcessType: App
+    postBuildScripts:
+      - name: Embed StikJIT
+        basedOnDependencyAnalysis: false
+        script: |
+          [ "$PLATFORM_NAME" = iphoneos ] || exit 0
+          SRC="$PROJECT_DIR/Frameworks/StikJIT.xcframework/ios-arm64/StikJIT.framework"
+          [ -d "$SRC" ] || { echo "error: no StikJIT: run Scripts/fetch-stikjit.sh"; exit 1; }
+          DEST="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
+          mkdir -p "$DEST"
+          rsync -a --delete "$SRC" "$DEST/"
+          codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DEST/StikJIT.framework"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.amendez.crate.jithelper
+        DEVELOPMENT_TEAM: L29MY952CB
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Development
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        # The embed script reads Frameworks/, outside the sandbox's inputs.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]: $(PROJECT_DIR)/Frameworks/StikJIT.xcframework/ios-arm64
+        OTHER_LDFLAGS[sdk=iphoneos*]: -framework StikJIT
+        CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: NO
+        CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]: NO
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64

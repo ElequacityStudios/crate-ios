@@ -17,3 +17,5 @@ Crate.xcodeproj/
 
 # Scratch
 *.log
+Frameworks/
+.deps/

@@ -6,6 +6,7 @@ struct HomeScreen: View {
 
     let onStart: (Machine) -> Void
     let onInstall: () -> Void
+    let onShowJIT: () -> Void
 
     @State private var deleting: Machine?
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -22,6 +23,11 @@ struct HomeScreen: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("My VMs")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: onShowJIT) {
+                        JITBadge()
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Install a VM", systemImage: "plus", action: onInstall)
                 }
@@ -71,6 +77,33 @@ private struct ViewportHeight: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// Whether this launch has JIT: a green dot and "JIT" when it does, gray when
+/// it doesn't, a spinner while it's being checked or turned on. Color is never
+/// the only sign: the label says it too.
+struct JITBadge: View {
+    @Environment(JITSession.self) private var jit
+    @ScaledMetric(relativeTo: .subheadline) private var dotSize = 8
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if jit.isTurningOn || jit.state == .checking {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Circle()
+                    .fill(jit.isOn ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
+                    .frame(width: dotSize, height: dotSize)
+            }
+            Text("JIT")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(jit.isOn ? .primary : .secondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(jit.isOn ? "JIT is on" : jit.isTurningOn ? "Turning JIT on" : "JIT is off")
+        .accessibilityHint("Shows JIT settings")
     }
 }
 

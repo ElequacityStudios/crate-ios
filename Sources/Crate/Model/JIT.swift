@@ -25,10 +25,8 @@ enum SettingsKey {
     static let codeRegionMB = "jit.codeRegionMB"
     static let installMemoryGB = "install.memoryGB"
 
-    /// STUB: whether JIT is on. Real JIT is a property of the running process,
-    /// asked of the kernel at launch; until that is wired in, this flag stands in
-    /// for it so both launch paths can be seen. Settings > UI Preview flips it.
-    static let stubJITEnabled = "stub.jitEnabled"
+    /// Debug builds: pretend JIT is on (see `JITSession.previewOn`).
+    static let previewJIT = "preview.jitOn"
 }
 
 /// Sizes offered for the JIT code region, in MB. It is claimed once per launch,

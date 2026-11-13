@@ -3,15 +3,14 @@ import SwiftUI
 /// JIT, memory and logs, then the stand-ins for what isn't wired in yet.
 struct SettingsScreen: View {
     @Environment(MachineStore.self) private var store
+    @Environment(JITSession.self) private var jit
 
-    @AppStorage(SettingsKey.stubJITEnabled) private var jitEnabled = false
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
     @AppStorage(SettingsKey.jitAtLaunch) private var jitAtLaunch = true
     @AppStorage(SettingsKey.codeRegionMB) private var codeRegionMB = CodeRegion.standard
 
     @State private var memory = MemoryReport()
     @State private var logURL: URL?
-    @State private var turningOnJIT = false
     @State private var confirmingRemoveAll = false
     @ScaledMetric(relativeTo: .body) private var statusDotSize = 9
 
@@ -38,22 +37,24 @@ struct SettingsScreen: View {
             LabeledContent("Status") {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(jitEnabled ? Color.green : Color.gray)
+                        .fill(statusColor)
                         .frame(width: statusDotSize, height: statusDotSize)
-                    Text(jitEnabled ? "On" : "Off")
+                    Text(statusText)
                 }
             }
-            if !jitEnabled {
-                Button(action: turnOnJIT) {
+            if !jit.isOn {
+                Button {
+                    Task { await jit.turnOn(JITMethod(rawValue: jitMethod) ?? .standard) }
+                } label: {
                     HStack {
                         Label("Turn On JIT", systemImage: "bolt.fill")
-                        if turningOnJIT {
+                        if jit.isTurningOn {
                             Spacer()
                             ProgressView()
                         }
                     }
                 }
-                .disabled(turningOnJIT)
+                .disabled(jit.isTurningOn || jit.state == .checking || jit.state == .off(.notEligible))
             }
             Picker("Method", selection: $jitMethod) {
                 ForEach(JITMethod.allCases) { method in
@@ -61,6 +62,17 @@ struct SettingsScreen: View {
                 }
             }
             .pickerStyle(.menu)
+            if selectedMethod == .builtInStikJIT {
+                Button {
+                    jit.showingSetup = true
+                } label: {
+                    LabeledContent {
+                        Text(PairingFile.exists ? "Paired" : "Not Set Up")
+                    } label: {
+                        Label("Set Up JIT", systemImage: "checklist")
+                    }
+                }
+            }
             Toggle("Turn on JIT when crate opens", isOn: $jitAtLaunch)
             Picker("Code region", selection: $codeRegionMB) {
                 ForEach(CodeRegion.choices, id: \.self) { mb in
@@ -71,8 +83,44 @@ struct SettingsScreen: View {
         } header: {
             Text("JIT")
         } footer: {
-            Text("crate needs JIT to run a VM. The code region is the memory set aside for translated code, claimed once per launch, so a change applies the next time crate opens.")
+            Text(jitFooter)
         }
+    }
+
+    private var statusText: String {
+        switch jit.state {
+        case .checking: "Checking…"
+        case .on(let mb): "On, \(mb) MB code region"
+        case .off where jit.isOn: "Pretending On"
+        case .off: "Off"
+        case .failed: "Didn't Work"
+        }
+    }
+
+    private var statusColor: Color {
+        switch jit.state {
+        case .on: .green
+        case .failed: .orange
+        case .off where jit.isOn: .green
+        case .checking, .off: .gray
+        }
+    }
+
+    private var selectedMethod: JITMethod {
+        JITMethod(rawValue: jitMethod) ?? .standard
+    }
+
+    private var jitFooter: String {
+        var parts: [String] = []
+        if let problem = jit.problem { parts.append(problem) }
+        switch selectedMethod {
+        case .builtInStikJIT:
+            parts.append("Built-in StikJIT needs this iPhone paired with crate and LocalDevVPN connected. Set Up JIT walks through both.")
+        case .stikDebug:
+            parts.append("StikDebug opens, asks you to confirm, then brings you back to crate.")
+        }
+        parts.append("crate needs JIT to run a VM. The code region is the memory set aside for translated code, claimed once per launch, so a change applies the next time crate opens.")
+        return parts.joined(separator: "\n\n")
     }
 
     // MARK: - Memory
@@ -138,7 +186,7 @@ struct SettingsScreen: View {
     /// it exist. Debug builds only; remove once JIT and installs are real.
     private var previewSection: some View {
         Section {
-            Toggle("JIT is on", isOn: $jitEnabled)
+            Toggle("Pretend JIT Is On", isOn: Bindable(jit).pretending)
             Button("Restore Sample VMs") { store.restoreSamples() }
             Button("Remove All VMs", role: .destructive) { confirmingRemoveAll = true }
                 .confirmationDialog("Remove all VMs?", isPresented: $confirmingRemoveAll,
@@ -150,17 +198,7 @@ struct SettingsScreen: View {
         } header: {
             Text("UI Preview")
         } footer: {
-            Text("Stand-ins for parts that aren't wired in yet. Relaunch crate with JIT on to see the default VM boot.")
-        }
-    }
-
-    /// STUB: pretends the selected method turned JIT on.
-    private func turnOnJIT() {
-        turningOnJIT = true
-        Task {
-            try? await Task.sleep(for: .seconds(1))
-            turningOnJIT = false
-            withAnimation { jitEnabled = true }
+            Text("Stand-ins for parts that aren't wired in yet. Pretending JIT is on shows the screens that need it; relaunch to see the default VM boot.")
         }
     }
 }

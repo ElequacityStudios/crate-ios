@@ -7,10 +7,10 @@ struct MachineScreen: View {
 
     @Environment(MachineStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(SettingsKey.stubJITEnabled) private var jitEnabled = false
+    @Environment(JITSession.self) private var jit
+    @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
 
     @State private var phase = Phase.starting
-    @State private var turningOnJIT = false
     @State private var confirmingStop = false
 
     enum Phase {
@@ -31,7 +31,12 @@ struct MachineScreen: View {
         }
         .overlay(alignment: .top) { topBar }
         .preferredColorScheme(.dark)
-        .task(id: jitEnabled) { await boot() }
+        .task(id: jit.isOn) { await boot() }
+        .sheet(isPresented: Bindable(jit).showingSetup) {
+            JITSetupView()
+                .environment(jit)
+                .preferredColorScheme(nil)
+        }
     }
 
     /// Close before the VM runs; Stop, confirmed, once it does, since stopping
@@ -84,9 +89,9 @@ struct MachineScreen: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                 Button {
-                    turnOnJIT()
+                    Task { await jit.turnOn(JITMethod(rawValue: jitMethod) ?? .standard) }
                 } label: {
-                    if turningOnJIT {
+                    if jit.isTurningOn {
                         ProgressView().frame(maxWidth: .infinity)
                     } else {
                         Label("Turn On JIT", systemImage: "bolt.fill")
@@ -97,7 +102,7 @@ struct MachineScreen: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
-                .disabled(turningOnJIT)
+                .disabled(jit.isTurningOn)
             }
             .padding(24)
             .frame(maxWidth: 360)
@@ -124,7 +129,7 @@ struct MachineScreen: View {
     }
 
     private func boot() async {
-        guard jitEnabled else {
+        guard jit.isOn else {
             phase = .needsJIT
             return
         }
@@ -133,15 +138,5 @@ struct MachineScreen: View {
         guard !Task.isCancelled else { return }
         withAnimation { phase = .running }
         store.markStarted(machine)
-    }
-
-    /// STUB: pretends the built-in enabler worked.
-    private func turnOnJIT() {
-        turningOnJIT = true
-        Task {
-            try? await Task.sleep(for: .seconds(1))
-            turningOnJIT = false
-            jitEnabled = true
-        }
     }
 }

@@ -3,21 +3,29 @@ import SwiftUI
 @main
 struct CrateApp: App {
     @State private var store: MachineStore
+    @State private var jit: JITSession
     private let options: LaunchOptions
 
     init() {
+        JITLog.begin()
         options = LaunchOptions.parse(ProcessInfo.processInfo.arguments)
         options.applyToDefaults()
         let store = MachineStore()
         if options.empty { store.removeAll() }
         if options.samples { store.restoreSamples() }
         _store = State(initialValue: store)
+        // First, while a debugger that will leave once it has authorized the
+        // code region is still attached.
+        let jit = JITSession()
+        jit.start()
+        _jit = State(initialValue: jit)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView(launchTab: options.tab, forceRail: options.rail)
                 .environment(store)
+                .environment(jit)
         }
     }
 }
@@ -50,7 +58,9 @@ struct LaunchOptions {
         return options
     }
 
+    /// `--jit=on|off` sets the debug builds' pretend-JIT switch, which the
+    /// real JIT state overrides when it's on.
     func applyToDefaults() {
-        if let jit { UserDefaults.standard.set(jit, forKey: SettingsKey.stubJITEnabled) }
+        if let jit { UserDefaults.standard.set(jit, forKey: SettingsKey.previewJIT) }
     }
 }

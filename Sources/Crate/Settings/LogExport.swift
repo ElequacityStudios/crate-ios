@@ -2,8 +2,8 @@ import Foundation
 
 /// The file Settings > Logs shares.
 enum LogExport {
-    /// STUB: writes a sample log, since nothing logs yet, and returns where it is.
-    /// The real one will gather the engine's and the app's logs into one file.
+    /// Writes this launch's log, after a few lines about the device, and returns
+    /// where it is. Only JIT logs so far; the engine's lines join it once it's in.
     static func prepare() -> URL {
         let stamp = Date.now.formatted(
             Date.ISO8601FormatStyle(timeZone: .current).year().month().day().dateSeparator(.dash))
@@ -11,18 +11,16 @@ enum LogExport {
             .appendingPathComponent("crate-\(stamp).log")
         let memory = MemoryReport()
         let lines = [
-            "crate \(appVersion) -- sample log (no engine wired in yet)",
+            "crate \(appVersion)",
             "date: \(Date.now.formatted(.iso8601))",
             "device: \(deviceModel), iOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
             "memory: physical \(Format.memory(memory.physical)), "
                 + "available \(memory.available.map(Format.memory) ?? "n/a"), "
                 + "footprint \(Format.memory(memory.footprint))",
-            "jit: stub=\(UserDefaults.standard.bool(forKey: SettingsKey.stubJITEnabled))",
-            "[0.000] app init",
-            "[0.012] jit: method=\(UserDefaults.standard.string(forKey: SettingsKey.jitMethod) ?? JITMethod.standard.rawValue)",
-            "[0.013] engine: not wired in",
+            "jit method: \(UserDefaults.standard.string(forKey: SettingsKey.jitMethod) ?? JITMethod.standard.rawValue)",
+            "",
         ]
-        try? lines.joined(separator: "\n").appending("\n")
+        try? (lines.joined(separator: "\n") + "\n" + JITLog.contents())
             .write(to: url, atomically: true, encoding: .utf8)
         return url
     }
