@@ -29,17 +29,29 @@ final class MachineRunner {
     let console = ConsoleBridge()
     let display = DisplayBridge()
     private var machine: OpaquePointer?
+    #if DEBUG
+    private let debugHooks = DebugHooks()
+    #endif
 
     init() {
         crate_set_log_callback({ _, level, message in
             guard let message else { return }
             let tag = level == CRATE_LOG_ERROR ? "crate error: " : level == CRATE_LOG_WARN ? "crate warning: " : "crate: "
             AppLog.write(tag + String(cString: message))
-        }, nil, CRATE_LOG_INFO)
+        }, nil, Self.logLevel)
     }
 
     var isRunning: Bool {
         phase == .starting || phase == .running
+    }
+
+    /// What crate logs: its debug lines too, in debug builds launched with
+    /// CRATE_LOG=debug (virglrenderer's VREND_DEBUG output is among them).
+    private static var logLevel: crate_log_level {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["CRATE_LOG"] == "debug" { return CRATE_LOG_DEBUG }
+        #endif
+        return CRATE_LOG_INFO
     }
 
     /// Builds the machine from `vm` and its guest files and starts it, in the
@@ -83,6 +95,9 @@ final class MachineRunner {
                     if crate_machine_start(made) == CRATE_OK {
                         AppLog.write(String(format: "vm: running, created in %.2f s", Date.now.timeIntervalSince(started)))
                         self.phase = .running
+                        #if DEBUG
+                        self.debugHooks.start(console: console, display: display)
+                        #endif
                     } else {
                         self.phase = .failed("crate couldn't start the VM: \(String(cString: crate_last_error())).")
                     }
@@ -164,6 +179,16 @@ final class MachineRunner {
             "getty@tty1.service", "getty@tty2.service", "getty@tty3.service",
             "getty@tty4.service", "getty@tty5.service", "getty@tty6.service",
         ].map { "systemd.mask=\($0)" }).joined(separator: " ")
+
+        /// 3D on an iPhone, where the app embeds virglrenderer, ANGLE and
+        /// MoltenVK (Scripts/build-virgl.sh and the rest); crate falls back to
+        /// 2D, saying so in the log, if they don't load. The Simulator has none
+        /// of them.
+        #if targetEnvironment(simulator)
+        static let gpu = CRATE_GPU_2D
+        #else
+        static let gpu = CRATE_GPU_VIRGL
+        #endif
     }
 
     private enum Created {
@@ -200,7 +225,7 @@ final class MachineRunner {
             {
                 var callbacks = display.callbacks
                 var index: UInt32 = 0
-                if let failure = check(crate_config_add_display(config, CRATE_GPU_2D, &callbacks, &index), "the display") {
+                if let failure = check(crate_config_add_display(config, Settings.gpu, &callbacks, &index), "the display") {
                     return failure
                 }
                 let modes = settings.displayModes
@@ -234,6 +259,9 @@ final class MachineRunner {
         default: text = "The VM stopped: \(error ?? "crate gave no reason")."
         }
         AppLog.write("vm: \(text)")
+        #if DEBUG
+        debugHooks.stop()
+        #endif
         console.detach()
         display.detach()
         phase = reason == CRATE_STOP_ERROR ? .failed(text) : .stopped(text)

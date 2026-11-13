@@ -80,6 +80,29 @@ targets:
       - framework: Frameworks/GLib.xcframework
         embed: true
       - package: SwiftTerm
+    # The VM's 3D: virglrenderer, libepoxy, ANGLE and MoltenVK, built by
+    # Scripts/build-moltenvk.sh, build-angle.sh and build-virgl.sh. They're for
+    # iPhones only and crate opens them itself, so they're copied in, not linked;
+    # without them the VM still runs, in 2D.
+    postBuildScripts:
+      - name: Embed GPU frameworks
+        basedOnDependencyAnalysis: false
+        script: |
+          [ "$PLATFORM_NAME" = iphoneos ] || exit 0
+          SRC="$PROJECT_DIR/Frameworks/GPU"
+          NAMES="MoltenVK EGL GLESv2 epoxy virglrenderer.1"
+          for name in $NAMES; do
+            [ -d "$SRC/$name.framework" ] || {
+              echo "warning: no $name.framework, so VMs get a 2D display: run Scripts/build-moltenvk.sh, build-angle.sh and build-virgl.sh"
+              exit 0
+            }
+          done
+          DEST="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
+          mkdir -p "$DEST"
+          for name in $NAMES; do
+            rsync -a --delete "$SRC/$name.framework" "$DEST/"
+            codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DEST/$name.framework"
+          done
     entitlements:
       path: Resources/Crate.entitlements
       properties:
@@ -99,7 +122,8 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The code region is claimed in C (a `brk` with arguments in x0 and x1).
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Crate/JIT/Crate-Bridging-Header.h
-        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        # The GPU embed script reads Frameworks/GPU, outside the sandbox's inputs.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         TARGETED_DEVICE_FAMILY: "1,2"
 
         # The Simulator does not verify signatures, so skip signing there. Scoped

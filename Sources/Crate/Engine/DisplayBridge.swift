@@ -145,6 +145,11 @@ final class DisplayBridge: @unchecked Sendable {
         if let sink, let image = picture() { sink(image) }
     }
 
+    #if DEBUG
+    /// The screen so far, for DebugHooks.
+    func snapshot() -> CGImage? { picture() }
+    #endif
+
     /// The screen so far, as a picture: a copy, so crate can keep drawing.
     private func picture() -> CGImage? {
         lock.withLock {

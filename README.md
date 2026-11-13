@@ -34,9 +34,13 @@ messages to `Library/Caches/idevice.log`.
 
 [crate](https://github.com/oneamendez/crate) runs the VM in this process, on the
 code region JIT claimed. The VM screen switches between its display (a virtio
-GPU the guest draws on in software, frames handed straight to the app, touch
-and keys as a virtio tablet and keyboard) and its serial console in a terminal
-([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), MIT). The network is
+GPU, frames handed straight to the app, touch and keys as a virtio tablet and
+keyboard) and its serial console in a terminal
+([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), MIT). On an iPhone the
+GPU does 3D: the guest's OpenGL runs on the iPhone's GPU through virglrenderer,
+ANGLE and MoltenVK, each built from upstream source (see
+[docs/PROVENANCE.md](docs/PROVENANCE.md)); in the Simulator the guest draws in
+software. The network is
 user-mode, through [libslirp](https://gitlab.freedesktop.org/slirp/libslirp)
 (BSD-3-Clause) and [GLib](https://gitlab.gnome.org/GNOME/glib) (LGPL-2.1-or-later),
 built from source as dynamic frameworks the app embeds. A VM's files live in
@@ -50,14 +54,23 @@ built from source as dynamic frameworks the app embeds. A VM's files live in
 `--user mobile` matters: without it crate can't write to the disk. Never add
 `--remove-existing-content`, which empties the app's whole container.
 
+Debug builds can be driven from a Mac the same way: while a VM runs, an empty
+`Library/Caches/debug/screen` gets its display saved as `screen.png` there, and
+`debug/command.txt` is typed into its console. Launched with
+`CRATE_GL_DEBUG=1` (`devicectl device process launch -e`), crate logs ANGLE's
+own GL messages; with `CRATE_LOG=debug`, its debug lines.
+
 ## Build
 
-Both libraries are fetched or built into `Frameworks/`, which isn't committed:
+The libraries are fetched or built into `Frameworks/`, which isn't committed:
 
     ./Scripts/fetch-stikjit.sh     # StikJIT 2.0.1, checked against its SHA-256
     ./Scripts/build-idevice.sh     # idevice v0.1.68 from source; needs Rust
     ./Scripts/build-crate.sh       # crate from ~/Repos/crate; needs Rust
     ./Scripts/build-slirp.sh       # libslirp 4.9.7 and GLib 2.90.1; needs meson
+    ./Scripts/build-moltenvk.sh    # MoltenVK 1.4.2; about 15 minutes
+    ./Scripts/build-angle.sh       # ANGLE; a 4 GB checkout, ANGLE_SRC reuses one
+    ./Scripts/build-virgl.sh       # libepoxy 1.5.10 and virglrenderer 1.3.0
     xcodegen generate
     open Crate.xcodeproj
 
