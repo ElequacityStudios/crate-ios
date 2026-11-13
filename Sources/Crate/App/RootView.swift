@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AppTab: Hashable, CaseIterable, Identifiable {
+enum AppTab: String, CaseIterable, Identifiable {
     case home
     case install
     case settings
@@ -29,14 +29,17 @@ struct RootView: View {
     @Environment(MachineStore.self) private var store
     @AppStorage(SettingsKey.stubJITEnabled) private var jitEnabled = false
 
-    @State private var tab: AppTab
+    /// Crate reopens on the tab it was left on.
+    @SceneStorage("tab") private var tab = AppTab.home
     @State private var running: Machine?
     @State private var didLaunch = false
     @State private var fold = FoldSignals()
+    /// A tab to open on regardless, from a launch argument.
+    private let launchTab: AppTab?
     private let forceRail: Bool
 
-    init(firstTab: AppTab, forceRail: Bool = false) {
-        _tab = State(initialValue: firstTab)
+    init(launchTab: AppTab? = nil, forceRail: Bool = false) {
+        self.launchTab = launchTab
         self.forceRail = forceRail
     }
 
@@ -86,8 +89,12 @@ struct RootView: View {
     private func bootDefaultAtLaunch() {
         guard !didLaunch else { return }
         didLaunch = true
+        if let launchTab { tab = launchTab }
         if jitEnabled, let machine = store.defaultMachine {
-            running = machine
+            // Already there when Crate opens, rather than sliding up over Home.
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { running = machine }
         }
     }
 }

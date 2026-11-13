@@ -11,15 +11,44 @@ struct MachineCard: View {
     let onToggleDefault: () -> Void
     let onDelete: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                // At the accessibility text sizes the card grows to fit its text
+                // (HomeScreen stops fixing its height): held to 75% of the
+                // screen, the details would crush the screenshot and spill out.
+                VStack(spacing: 14) {
+                    screenshot
+                        .aspectRatio(16 / 10, contentMode: .fit)
+                    details(specs: MachineSpecs(machine: machine), wide: false)
+                }
+                .padding(14)
+            } else {
+                sized
+            }
+        }
+        // Secondary on the page's primary grouped background, as the HIG's
+        // colour hierarchy has it.
+        .background(Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    private var screenshot: some View {
+        MachineScreenshot(machine: machine)
+            .overlay(alignment: .topTrailing) { starButton.padding(10) }
+    }
+
+    /// The card at the size HomeScreen gives it.
+    private var sized: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width > geometry.size.height * 1.25
             let layout = wide
                 ? AnyLayout(HStackLayout(alignment: .top, spacing: 16))
                 : AnyLayout(VStackLayout(spacing: 14))
             layout {
-                MachineScreenshot(machine: machine)
-                    .overlay(alignment: .topTrailing) { starButton.padding(10) }
+                screenshot
                     .frame(maxWidth: wide ? geometry.size.width * 0.48 : .infinity)
                 if wide {
                     // Landscape on the closed Duo leaves the details about 200 pt,
@@ -36,9 +65,6 @@ struct MachineCard: View {
             }
             .padding(14)
         }
-        .background(Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
     }
 
     /// Side by side, Start sits at the bottom of the details column; stacked,
@@ -62,69 +88,104 @@ struct MachineCard: View {
         }
     }
 
+    /// Badge, name and version, and the More menu. At the accessibility text
+    /// sizes the name and version go under the badge, so they have the card's
+    /// full width.
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 12) {
-            DistributionBadge(distribution: machine.distribution, size: 44)
-            // The version beside the name when there's room, under it when not.
-            ViewThatFits(in: .horizontal) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(machine.name)
-                            .font(.title2.bold())
-                        Text(machine.versionLabel)
-                            .font(.title3)
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    DistributionBadge(distribution: machine.distribution, size: 44)
+                    Spacer(minLength: 0)
+                    moreMenu
+                }
+                Text(machine.name)
+                    .font(.title2.bold())
+                Text("\(machine.versionLabel) · \(machine.distribution.family.title)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            HStack(spacing: 12) {
+                DistributionBadge(distribution: machine.distribution, size: 44)
+                // The version beside the name when there's room, under it when not.
+                ViewThatFits(in: .horizontal) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(machine.name)
+                                .font(.title2.bold())
+                            Text(machine.versionLabel)
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("\(machine.distribution.family.title) · \(machine.architecture)")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    Text("\(machine.distribution.family.title) · \(machine.architecture)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(machine.name)
+                            .font(.title2.bold())
+                            .minimumScaleFactor(0.7)
+                        Text("\(machine.versionLabel) · \(machine.distribution.family.title)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(machine.name)
-                        .font(.title2.bold())
-                        .minimumScaleFactor(0.7)
-                    Text("\(machine.versionLabel) · \(machine.distribution.family.title)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                .lineLimit(1)
+                Spacer(minLength: 0)
+                moreMenu
             }
-            .lineLimit(1)
-            Spacer(minLength: 0)
-            Menu {
-                Button(isDefault ? "Remove as Default" : "Make Default",
-                       systemImage: isDefault ? "star.slash" : "star",
-                       action: onToggleDefault)
-                Button("Edit Settings…", systemImage: "slider.horizontal.3") {}
-                    .disabled(true)
-                Divider()
-                Button("Delete…", systemImage: "trash", role: .destructive, action: onDelete)
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 40, height: 40)
-                    .background(.fill.tertiary, in: Circle())
-            }
-            .accessibilityLabel("More")
         }
     }
 
+    private var moreMenu: some View {
+        Menu {
+            Button(isDefault ? "Remove as Default" : "Make Default",
+                   systemImage: isDefault ? "star.slash" : "star",
+                   action: onToggleDefault)
+            Button("Edit Settings…", systemImage: "slider.horizontal.3") {}
+                .disabled(true)
+            Divider()
+            Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+        } label: {
+            // Monochrome: the card's screenshot is colourful enough, and the
+            // accent colour is kept for Start.
+            Image(systemName: "ellipsis")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .background(.fill.tertiary, in: Circle())
+        }
+        .tint(.primary)
+        // A control, not content: it stays a control's size at the largest
+        // text sizes, as tab titles do.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityLabel("More")
+    }
+
     /// The star: filled and labelled on the default VM, a plain outline otherwise.
+    ///
+    /// It sits on the screenshot, which is content, so it uses a standard
+    /// material rather than Liquid Glass; dark, so it reads the same over any
+    /// screenshot in either appearance.
     private var starButton: some View {
         Button(action: onToggleDefault) {
             HStack(spacing: 5) {
                 Image(systemName: isDefault ? "star.fill" : "star")
-                    .foregroundStyle(isDefault ? .yellow : .white)
+                    .foregroundStyle(isDefault ? AnyShapeStyle(.yellow) : AnyShapeStyle(.primary))
                 if isDefault {
                     Text("Default")
-                        .foregroundStyle(.white)
                 }
             }
             .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, isDefault ? 12 : 0)
-            .frame(minWidth: 36, minHeight: 36)
-            .background(.black.opacity(0.45), in: Capsule())
+            .padding(.horizontal, isDefault ? 14 : 0)
+            .frame(minWidth: 44, minHeight: 44)
+            .background(.ultraThinMaterial, in: Capsule())
+            .environment(\.colorScheme, .dark)
         }
         .buttonStyle(.plain)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityLabel(isDefault ? "Default VM. Remove as default" : "Make default")
     }
 }
@@ -163,12 +224,17 @@ struct MachineSpecs: View {
     /// One row is CPUs, memory and disk; two add desktop, display and last used.
     var rows = 2
 
-    private let columns = [GridItem(.flexible(), spacing: 6),
-                           GridItem(.flexible(), spacing: 6),
-                           GridItem(.flexible(), spacing: 6)]
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// Three across, or two at the accessibility text sizes, where three
+    /// columns would truncate every value.
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .leading),
+              count: typeSize.isAccessibilitySize ? 2 : 3)
+    }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 6) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
             SpecTile(title: "CPUs", systemImage: "cpu", value: "\(machine.cpuCount) cores")
             SpecTile(title: "Memory", systemImage: "memorychip", value: "\(machine.memoryGB) GB")
             SpecTile(title: "Disk", systemImage: "internaldrive",
@@ -199,6 +265,8 @@ struct SpecTile: View {
     let systemImage: String
     let value: String
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             // Just the icon when the tile is too narrow for its title.
@@ -211,13 +279,12 @@ struct SpecTile: View {
             .lineLimit(1)
             Text(value)
                 .font(.footnote.weight(.semibold))
-                .lineLimit(1)
+                .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 .minimumScaleFactor(0.75)
         }
+        // No box of its own: the card is the box, and the HIG groups within
+        // one by alignment and spacing rather than boxes inside it.
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

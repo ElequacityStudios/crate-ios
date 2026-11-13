@@ -3,6 +3,7 @@ import SwiftUI
 /// Pick a system image and a memory limit, then install it.
 struct InstallScreen: View {
     @Environment(MachineStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     let onShowHome: () -> Void
 
@@ -10,11 +11,19 @@ struct InstallScreen: View {
     @AppStorage(SettingsKey.installMemoryGB) private var memoryGB = 6
     @State private var install = InstallProgress.idle
     @State private var installTask: Task<Void, Never>?
+    @State private var confirmingCancel = false
 
     private let memoryChoices = [4, 6, 8]
 
     private var selected: CatalogImage {
         CatalogImage.catalog.first { $0.id == selectedID } ?? CatalogImage.catalog[0]
+    }
+
+    /// Nil when iOS doesn't say, in which case Install stays available.
+    private var freeBytes: Int64? { Format.freeDiskBytes() }
+
+    private var hasRoom: Bool {
+        freeBytes.map { $0 >= selected.installedBytes } ?? true
     }
 
     var body: some View {
@@ -50,9 +59,37 @@ struct InstallScreen: View {
                     Text(memoryFooter)
                 }
                 .disabled(install.isBusy)
+
+                // At the accessibility text sizes a pinned bar would cover half
+                // the screen, so Install scrolls with the list instead.
+                if typeSize.isAccessibilitySize {
+                    Section {
+                        installControls
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
             }
             .navigationTitle("Install Vms")
-            .safeAreaInset(edge: .bottom) { installBar }
+            .safeAreaInset(edge: .bottom) {
+                if !typeSize.isAccessibilitySize {
+                    installControls
+                        .padding(.horizontal, 20)
+                        .padding(.top, 14)
+                        .padding(.bottom, 10)
+                        .background(.bar)
+                }
+            }
+            .onChange(of: selectedID) {
+                // A finished install belongs to the image it was for.
+                if case .done = install { install = .idle }
+            }
+            .alert(install.cancelTitle(for: selected), isPresented: $confirmingCancel) {
+                Button(install.cancelButton, role: .destructive, action: cancel)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(install.cancelMessage(for: selected))
+            }
         }
     }
 
@@ -64,9 +101,10 @@ struct InstallScreen: View {
         return text
     }
 
-    // MARK: - Install bar
+    // MARK: - Install controls
 
-    private var installBar: some View {
+    @ViewBuilder
+    private var installControls: some View {
         VStack(spacing: 8) {
             switch install {
             case .idle:
@@ -79,6 +117,7 @@ struct InstallScreen: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
+                .disabled(!hasRoom)
                 Text(spaceNeeded)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -89,7 +128,7 @@ struct InstallScreen: View {
                         Text(install.title(for: selected))
                             .font(.headline)
                         Spacer()
-                        Button("Cancel", role: .cancel, action: cancel)
+                        Button("Cancel") { confirmingCancel = true }
                     }
                     ProgressView(value: fraction)
                     Text(install.detail(for: selected))
@@ -97,20 +136,20 @@ struct InstallScreen: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-            case .done:
+            case .done(let image):
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title)
                         .foregroundStyle(.green)
                     VStack(alignment: .leading) {
-                        Text("\(selected.name) is installed")
+                        Text("\(image.name) is installed")
                             .font(.headline)
                         Text("It's on Home, ready to start.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Show") {
+                    Button("Go to Home") {
                         install = .idle
                         onShowHome()
                     }
@@ -119,18 +158,16 @@ struct InstallScreen: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
-        .background(.bar)
     }
 
     private var spaceNeeded: String {
-        var text = "Needs \(Format.bytes(selected.installedBytes)) of storage"
-        if let free = Format.freeDiskBytes() {
-            text += " · \(Format.bytes(free)) available"
+        guard let free = freeBytes else {
+            return "Needs \(Format.bytes(selected.installedBytes)) of storage"
         }
-        return text
+        if !hasRoom {
+            return "Free up \(Format.bytes(selected.installedBytes - free)) to install \(selected.name)."
+        }
+        return "Needs \(Format.bytes(selected.installedBytes)) of storage · \(Format.bytes(free)) available"
     }
 
     // MARK: - Fake install
@@ -151,7 +188,9 @@ struct InstallScreen: View {
                 if Task.isCancelled { return }
             }
             store.add(image.machine(memoryGB: memory))
-            withAnimation { install = .done }
+            // Finished while "Stop Download?" was up: nothing left to stop.
+            confirmingCancel = false
+            withAnimation { install = .done(image) }
         }
     }
 
@@ -167,7 +206,7 @@ enum InstallProgress: Equatable {
     case idle
     case downloading(Double)
     case installing(Double)
-    case done
+    case done(CatalogImage)
 
     var isBusy: Bool {
         switch self {
@@ -195,56 +234,106 @@ enum InstallProgress: Equatable {
             return ""
         }
     }
+
+    // Cancelling throws the download away, so it's confirmed first.
+
+    func cancelTitle(for image: CatalogImage) -> String {
+        switch self {
+        case .installing: "Stop Installing \(image.name)?"
+        default: "Stop Downloading \(image.name)?"
+        }
+    }
+
+    var cancelButton: String {
+        switch self {
+        case .installing: "Stop Installing"
+        default: "Stop Download"
+        }
+    }
+
+    func cancelMessage(for image: CatalogImage) -> String {
+        switch self {
+        case .downloading(let fraction):
+            let done = Int64(Double(image.downloadBytes) * fraction)
+            return "The \(Format.bytes(done)) downloaded so far is discarded."
+        default:
+            return "The download is discarded, and starts over next time."
+        }
+    }
 }
 
 /// One downloadable image: badge, name with the version beside it, and a check
-/// when selected.
+/// when selected. At the accessibility text sizes the text goes under the
+/// badge, so the name has the row's full width.
 struct CatalogRow: View {
     let image: CatalogImage
     let isSelected: Bool
     let isInstalled: Bool
     let onSelect: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 14) {
-                DistributionBadge(distribution: image.distribution, size: 44)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(image.name)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                            .layoutPriority(1)
-                        Text(image.version)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    .lineLimit(1)
-                    HStack(spacing: 6) {
-                        Text("\(image.desktop) · \(Format.bytes(image.downloadBytes))")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        if isInstalled {
-                            Text("Installed")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.fill.tertiary, in: Capsule())
+            Group {
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            DistributionBadge(distribution: image.distribution, size: 44)
+                            Spacer(minLength: 0)
+                            checkmark
                         }
+                        text
+                    }
+                } else {
+                    HStack(spacing: 14) {
+                        DistributionBadge(distribution: image.distribution, size: 44)
+                        text
+                        Spacer(minLength: 0)
+                        checkmark
                     }
                 }
-                Spacer(minLength: 0)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.5))
             }
             .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var text: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            let nameAndVersion = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+            nameAndVersion {
+                Text(image.name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .layoutPriority(1)
+                Text(image.version)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
+            Text(details)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+        }
+    }
+
+    /// "Xfce · 1.5 GB", and "· Installed" once there's a copy on Home.
+    private var details: String {
+        var parts = [image.desktop, Format.bytes(image.downloadBytes)]
+        if isInstalled { parts.append("Installed") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var checkmark: some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.title2)
+            .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
     }
 }

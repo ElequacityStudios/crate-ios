@@ -11,6 +11,7 @@ struct MachineScreen: View {
 
     @State private var phase = Phase.starting
     @State private var turningOnJIT = false
+    @State private var confirmingStop = false
 
     enum Phase {
         case needsJIT
@@ -33,15 +34,33 @@ struct MachineScreen: View {
         .task(id: jitEnabled) { await boot() }
     }
 
+    /// Close before the VM runs; Stop, confirmed, once it does, since stopping
+    /// a running VM loses whatever its guest hasn't saved.
     private var topBar: some View {
         HStack {
-            Button(action: { dismiss() }) {
-                Label(phase == .running ? "Stop" : "Close",
-                      systemImage: phase == .running ? "stop.fill" : "xmark")
+            if phase == .running {
+                Button {
+                    confirmingStop = true
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.headline)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .confirmationDialog("Stop \(machine.name)?", isPresented: $confirmingStop,
+                                    titleVisibility: .visible) {
+                    Button("Stop VM", role: .destructive) { dismiss() }
+                } message: {
+                    Text("Anything not saved in \(machine.name) is lost.")
+                }
+            } else {
+                Button("Close", systemImage: "xmark") { dismiss() }
+                    .labelStyle(.iconOnly)
                     .font(.headline)
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.large)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
             Spacer()
             Text("\(machine.name) \(machine.version)")
                 .font(.headline)

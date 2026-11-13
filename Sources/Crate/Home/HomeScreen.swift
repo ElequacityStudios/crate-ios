@@ -8,6 +8,7 @@ struct HomeScreen: View {
     let onInstall: () -> Void
 
     @State private var deleting: Machine?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         NavigationStack {
@@ -48,7 +49,7 @@ struct HomeScreen: View {
                         onStart: { onStart(machine) },
                         onToggleDefault: { store.toggleDefault(machine) },
                         onDelete: { deleting = machine })
-                    .containerRelativeFrame(.vertical) { height, _ in height * 0.75 }
+                    .modifier(ViewportHeight(fraction: typeSize.isAccessibilitySize ? nil : 0.75))
                 }
             }
             .scrollTargetLayout()
@@ -56,6 +57,20 @@ struct HomeScreen: View {
         .scrollTargetBehavior(.viewAligned)
         .contentMargins(.horizontal, 16, for: .scrollContent)
         .contentMargins(.vertical, 12, for: .scrollContent)
+    }
+}
+
+/// Sizes a card to a fraction of the scroll view's height, or leaves it to
+/// its content when the fraction is nil.
+private struct ViewportHeight: ViewModifier {
+    let fraction: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let fraction {
+            content.containerRelativeFrame(.vertical) { height, _ in height * fraction }
+        } else {
+            content
+        }
     }
 }
 

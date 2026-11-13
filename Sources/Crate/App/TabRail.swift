@@ -18,24 +18,32 @@ struct TabRail: View {
                     Button {
                         selection = tab
                     } label: {
-                        Image(systemName: tab.systemImage)
-                            .symbolVariant(.fill)
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                            .frame(width: 50, height: 54)
-                            .background {
-                                if isSelected {
-                                    Capsule().fill(.fill.secondary)
-                                }
+                        // A label under each icon, as the HIG asks of tab bars;
+                        // filled symbols, as the system's tab bar uses.
+                        VStack(spacing: 2) {
+                            Image(systemName: tab.systemImage)
+                                .symbolVariant(.fill)
+                                .font(.title3.weight(.semibold))
+                            Text(tab.title)
+                                .font(.caption2.weight(.medium))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                        .frame(width: 62, height: 56)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                    .fill(.fill.secondary)
                             }
-                            .contentShape(Capsule())
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(tab.title)
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
-            .padding(5)
+            .padding(4)
             .railBackground()
             .padding(.bottom, 8)
         }
@@ -50,9 +58,9 @@ private extension View {
     @ViewBuilder
     func railBackground() -> some View {
         if #available(iOS 26.0, *) {
-            glassEffect(.regular, in: Capsule())
+            glassEffect(.regular, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         } else {
-            background(.regularMaterial, in: Capsule())
+            background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
     }
 }

@@ -12,6 +12,8 @@ struct SettingsScreen: View {
     @State private var memory = MemoryReport()
     @State private var logURL: URL?
     @State private var turningOnJIT = false
+    @State private var confirmingRemoveAll = false
+    @ScaledMetric(relativeTo: .body) private var statusDotSize = 9
 
     var body: some View {
         NavigationStack {
@@ -19,7 +21,9 @@ struct SettingsScreen: View {
                 jitSection
                 memorySection
                 logsSection
+                #if DEBUG
                 previewSection
+                #endif
             }
             .navigationTitle("Settings")
             .task { await refreshMemory() }
@@ -34,8 +38,8 @@ struct SettingsScreen: View {
             LabeledContent("Status") {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(jitEnabled ? Color.green : Color.secondary.opacity(0.5))
-                        .frame(width: 9, height: 9)
+                        .fill(jitEnabled ? Color.green : Color.gray)
+                        .frame(width: statusDotSize, height: statusDotSize)
                     Text(jitEnabled ? "On" : "Off")
                 }
             }
@@ -131,12 +135,18 @@ struct SettingsScreen: View {
     // MARK: - UI preview
 
     /// STUB controls, for seeing every state of the UI before the parts behind
-    /// it exist. Remove once JIT and installs are real.
+    /// it exist. Debug builds only; remove once JIT and installs are real.
     private var previewSection: some View {
         Section {
             Toggle("JIT is on", isOn: $jitEnabled)
             Button("Restore Sample VMs") { store.restoreSamples() }
-            Button("Remove All VMs", role: .destructive) { store.removeAll() }
+            Button("Remove All VMs", role: .destructive) { confirmingRemoveAll = true }
+                .confirmationDialog("Remove all VMs?", isPresented: $confirmingRemoveAll,
+                                    titleVisibility: .visible) {
+                    Button("Remove All VMs", role: .destructive) { store.removeAll() }
+                } message: {
+                    Text("Their disks are removed from this iPhone. This can't be undone.")
+                }
         } header: {
             Text("UI Preview")
         } footer: {

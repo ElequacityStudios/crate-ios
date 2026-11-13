@@ -27,14 +27,16 @@ struct Distribution: Identifiable, Hashable {
     /// The letter on the badge. Distribution logos are trademarks, so the badge
     /// is a monogram in the distribution's colour rather than the logo itself.
     let monogram: String
+    /// A system colour, so it has dark and increased-contrast variants. Not
+    /// red (destructive actions) or blue (the accent, which means "tappable"),
+    /// and dark enough for a white letter: pink for Debian's red, indigo for
+    /// Arch's blue.
     let color: Color
 
     static let debian = Distribution(
-        id: "debian", name: "Debian", family: .linux, monogram: "D",
-        color: Color(red: 0.84, green: 0.04, blue: 0.33))
+        id: "debian", name: "Debian", family: .linux, monogram: "D", color: .pink)
     static let arch = Distribution(
-        id: "arch", name: "Arch Linux", family: .linux, monogram: "A",
-        color: Color(red: 0.09, green: 0.58, blue: 0.82))
+        id: "arch", name: "Arch Linux", family: .linux, monogram: "A", color: .indigo)
 
     static let all: [Distribution] = [.debian, .arch]
 

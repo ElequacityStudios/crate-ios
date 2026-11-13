@@ -16,7 +16,7 @@ struct CrateApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(firstTab: options.tab ?? .home, forceRail: options.rail)
+            RootView(launchTab: options.tab, forceRail: options.rail)
                 .environment(store)
         }
     }

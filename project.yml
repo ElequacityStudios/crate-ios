@@ -23,7 +23,10 @@ targets:
         CFBundleDisplayName: Crate
         CFBundleShortVersionString: "0.1"
         CFBundleVersion: "1"
-        UILaunchScreen: {}
+        # The system's grouped background, as Home's, so launch doesn't flash
+        # white before the first screen (HIG: Launching).
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
@@ -49,7 +52,6 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         TARGETED_DEVICE_FAMILY: "1,2"
 
