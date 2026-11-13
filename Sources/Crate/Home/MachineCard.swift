@@ -20,8 +20,19 @@ struct MachineCard: View {
             layout {
                 MachineScreenshot(machine: machine)
                     .overlay(alignment: .topTrailing) { starButton.padding(10) }
-                    .frame(maxWidth: wide ? geometry.size.width * 0.52 : .infinity)
-                details
+                    .frame(maxWidth: wide ? geometry.size.width * 0.48 : .infinity)
+                if wide {
+                    // Landscape on the closed Duo leaves the details about 200 pt,
+                    // too short for the whole grid; it then shrinks to one row,
+                    // and failing that to one line of figures.
+                    ViewThatFits(in: .vertical) {
+                        details(specs: MachineSpecs(machine: machine))
+                        details(specs: MachineSpecs(machine: machine, rows: 1))
+                        details(specs: MachineSpecLine(machine: machine))
+                    }
+                } else {
+                    details(specs: MachineSpecs(machine: machine))
+                }
             }
             .padding(14)
         }
@@ -30,10 +41,10 @@ struct MachineCard: View {
         .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
     }
 
-    private var details: some View {
+    private func details(specs: some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            MachineSpecs(machine: machine)
+            specs
             Spacer(minLength: 0)
             Button(action: onStart) {
                 Label("Start", systemImage: "play.fill")
@@ -50,20 +61,30 @@ struct MachineCard: View {
     private var header: some View {
         HStack(spacing: 12) {
             DistributionBadge(distribution: machine.distribution, size: 44)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(machine.name)
-                        .font(.title2.bold())
-                    Text(machine.versionLabel)
-                        .font(.title3)
+            // The version beside the name when there's room, under it when not.
+            ViewThatFits(in: .horizontal) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(machine.name)
+                            .font(.title2.bold())
+                        Text(machine.versionLabel)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("\(machine.distribution.family.title) · \(machine.architecture)")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                Text("\(machine.distribution.family.title) · \(machine.architecture)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(machine.name)
+                        .font(.title2.bold())
+                        .minimumScaleFactor(0.7)
+                    Text("\(machine.versionLabel) · \(machine.distribution.family.title)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .lineLimit(1)
             Spacer(minLength: 0)
             Menu {
                 Button(isDefault ? "Remove as Default" : "Make Default",
@@ -135,6 +156,8 @@ struct MachineScreenshot: View {
 /// The VM's configuration as a grid of small tiles.
 struct MachineSpecs: View {
     let machine: Machine
+    /// One row is CPUs, memory and disk; two add desktop, display and last used.
+    var rows = 2
 
     private let columns = [GridItem(.flexible(), spacing: 6),
                            GridItem(.flexible(), spacing: 6),
@@ -146,10 +169,24 @@ struct MachineSpecs: View {
             SpecTile(title: "Memory", systemImage: "memorychip", value: "\(machine.memoryGB) GB")
             SpecTile(title: "Disk", systemImage: "internaldrive",
                      value: "\(machine.diskUsedGB.formatted(.number.precision(.fractionLength(1)))) of \(machine.diskGB) GB")
-            SpecTile(title: "Desktop", systemImage: "macwindow", value: machine.desktop)
-            SpecTile(title: "Display", systemImage: "display", value: machine.display)
-            SpecTile(title: "Last used", systemImage: "clock", value: Format.relative(machine.lastStarted))
+            if rows > 1 {
+                SpecTile(title: "Desktop", systemImage: "macwindow", value: machine.desktop)
+                SpecTile(title: "Display", systemImage: "display", value: machine.display)
+                SpecTile(title: "Last used", systemImage: "clock", value: Format.relative(machine.lastStarted))
+            }
         }
+    }
+}
+
+/// The figures on one line, for a card too short for ``MachineSpecs``.
+struct MachineSpecLine: View {
+    let machine: Machine
+
+    var body: some View {
+        Text("\(Image(systemName: "cpu")) \(machine.cpuCount)   \(Image(systemName: "memorychip")) \(machine.memoryGB) GB   \(Image(systemName: "internaldrive")) \(machine.diskGB) GB   \(Image(systemName: "macwindow")) \(machine.desktop)")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
     }
 }
 
@@ -160,11 +197,14 @@ struct SpecTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Label(title, systemImage: systemImage)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .labelStyle(.titleAndIcon)
-                .lineLimit(1)
+            // Just the icon when the tile is too narrow for its title.
+            ViewThatFits(in: .horizontal) {
+                Label(title, systemImage: systemImage)
+                Image(systemName: systemImage)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
             Text(value)
                 .font(.footnote.weight(.semibold))
                 .lineLimit(1)

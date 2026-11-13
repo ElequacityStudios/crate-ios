@@ -5,7 +5,8 @@ enum LogExport {
     /// STUB: writes a sample log, since nothing logs yet, and returns where it is.
     /// The real one will gather the engine's and the app's logs into one file.
     static func prepare() -> URL {
-        let stamp = Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+        let stamp = Date.now.formatted(
+            Date.ISO8601FormatStyle(timeZone: .current).year().month().day().dateSeparator(.dash))
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("crate-\(stamp).log")
         let memory = MemoryReport()
