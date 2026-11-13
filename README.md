@@ -55,8 +55,9 @@ built from source as dynamic frameworks the app embeds. A VM's files live in
 `--remove-existing-content`, which empties the app's whole container.
 
 Debug builds can be driven from a Mac the same way: while a VM runs, an empty
-`Library/Caches/debug/screen` gets its display saved as `screen.png` there, and
-`debug/command.txt` is typed into its console. Launched with
+`Library/Caches/debug/screen` gets its display saved as `screen.png` there,
+`debug/command.txt` is typed into its console, and `debug/size.txt` ("WxH" in
+points) resizes its desktop as rotating or folding the iPhone would. Launched with
 `CRATE_GL_DEBUG=1` (`devicectl device process launch -e`), crate logs ANGLE's
 own GL messages; with `CRATE_LOG=debug`, its debug lines.
 

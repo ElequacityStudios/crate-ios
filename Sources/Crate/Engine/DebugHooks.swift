@@ -9,6 +9,8 @@ import UniformTypeIdentifiers
 ///
 /// - `screen`: the display's current frame goes to `screen.png`.
 /// - `command.txt`: its text is typed into the serial console.
+/// - `size.txt`: "WIDTHxHEIGHT" in points, fitted as if the view were that
+///   size, as rotating or folding the iPhone would.
 ///
 /// Each request file is removed once it's done.
 @MainActor
@@ -46,6 +48,14 @@ final class DebugHooks {
         if let text = try? Data(contentsOf: command) {
             try? files.removeItem(at: command)
             console.send(ArraySlice(text))
+        }
+        let size = folder.appendingPathComponent("size.txt")
+        if let text = try? String(contentsOf: size, encoding: .utf8) {
+            try? files.removeItem(at: size)
+            let numbers = text.split(whereSeparator: { !$0.isNumber }).compactMap { Double($0) }
+            if numbers.count == 2 {
+                Task { @MainActor in display.fit(CGSize(width: numbers[0], height: numbers[1])) }
+            }
         }
     }
 }

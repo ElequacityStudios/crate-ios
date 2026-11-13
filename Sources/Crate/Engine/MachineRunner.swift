@@ -77,7 +77,7 @@ final class MachineRunner {
         phase = .starting
         machineID = vm.id
         console.reset()
-        let settings = Settings(vm: vm, files: files)
+        let settings = Settings(vm: vm, files: files, display: display)
         AppLog.write("vm: starting \(vm.name): \(settings.cpus) CPUs, \(settings.memoryMiB) MiB, "
                      + "code \(region.size >> 20) MiB; \(settings.commandLine)")
         let console = self.console
@@ -129,7 +129,7 @@ final class MachineRunner {
         let commandLine: String
         let displayModes: [crate_display_mode]
 
-        init(vm: Machine, files: GuestFiles) {
+        init(vm: Machine, files: GuestFiles, display: DisplayBridge) {
             // A core left for the app and iOS.
             cpus = max(1, min(vm.cpuCount, ProcessInfo.processInfo.activeProcessorCount - 1))
             memoryMiB = Self.memory(askedGB: vm.memoryGB)
@@ -137,14 +137,17 @@ final class MachineRunner {
             initrd = files.initrd.path
             disk = files.disk.path
             commandLine = Self.commandLine
-            displayModes = Self.modes(preferring: vm.display)
+            displayModes = display.modes(after: Self.modes(preferring: vm.display))
         }
 
-        /// The VM's own display size first ("1280 × 800"), the size its desktop
-        /// starts at, then a few others the guest can change to.
+        /// The VM's own display size first ("1280 × 800"), then a few others
+        /// the guest can change to: what it's offered after the size that fits
+        /// the screen (DisplayBridge.fit), or instead of it before the screen
+        /// has been laid out. Not 800 × 600, which aTerm's guest image asks
+        /// for at every start: offered, it would win over the screen's size.
         static func modes(preferring display: String) -> [crate_display_mode] {
             let numbers = display.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
-            var sizes = [(1280, 800), (1024, 768), (1920, 1200), (800, 600)]
+            var sizes = [(1280, 800), (1024, 768), (1920, 1200)]
             if numbers.count == 2 {
                 let preferred = (numbers[0], numbers[1])
                 sizes.removeAll { $0 == preferred }

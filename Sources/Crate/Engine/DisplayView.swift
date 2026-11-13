@@ -67,6 +67,12 @@ struct DisplayView: UIViewRepresentable {
             layer.contents = image
         }
 
+        /// The guest's desktop takes the view's shape (DisplayBridge.fit).
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            bridge.fit(bounds.size)
+        }
+
         // MARK: Touch as the tablet
 
         /// Where the screen sits in the view, scaled to fit.

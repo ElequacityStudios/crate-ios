@@ -120,6 +120,9 @@ struct MachineScreen: View {
             case .idle, .starting, .running:
                 if showing == .display {
                     DisplayView(bridge: runner.display, showsKeyboard: $showsKeyboard, hasPicture: $hasPicture)
+                        // The keyboard covers the desktop rather than resizing
+                        // it, which the guest would redo its layout for.
+                        .ignoresSafeArea(.keyboard)
                         .overlay {
                             if !hasPicture {
                                 VStack(spacing: 12) {

@@ -21,6 +21,13 @@ final class DisplayBridge: @unchecked Sendable {
     private var flushScheduled = false
     private var sink: (@MainActor (CGImage) -> Void)?
     private var wantsActive = false
+    /// The VM's own size and a few common ones, offered after the size that
+    /// fits the view.
+    private var otherModes: [crate_display_mode] = []
+    /// The size that fits the view, once it has one.
+    private var fitted: crate_display_mode?
+    /// What the guest was last offered, so the same offer isn't made twice.
+    private var offered: crate_display_mode?
 
     /// For crate_config_add_display; `self` outlives the machine.
     var callbacks: crate_display_callbacks {
@@ -43,6 +50,77 @@ final class DisplayBridge: @unchecked Sendable {
             return wantsActive
         }
         if active { crate_display_set_active(machine, index, true) }
+        offerModes()
+    }
+
+    // MARK: - The guest's size
+
+    /// The sizes for a new machine: the one that fits the view first, if the
+    /// view has been laid out, then `others`, which later offers keep.
+    func modes(after others: [crate_display_mode]) -> [crate_display_mode] {
+        lock.withLock {
+            otherModes = others
+            offered = fitted
+            return list()
+        }
+    }
+
+    /// The view is `points` big: the guest is offered a desktop of that shape,
+    /// and switches to it if it follows its display's preferred mode, as a
+    /// guest does by default. Rotating or folding the iPhone offers a new one.
+    @MainActor
+    func fit(_ points: CGSize) {
+        guard let mode = Self.mode(fitting: points) else { return }
+        // Rotating or folding lays the view out more than once on the way:
+        // only the size it settles on is offered.
+        pendingFit?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            let changed = lock.withLock { () -> Bool in
+                guard self.fitted?.width != mode.width || self.fitted?.height != mode.height else { return false }
+                self.fitted = mode
+                return true
+            }
+            guard changed else { return }
+            AppLog.write("display: \(mode.width)x\(mode.height) fits \(Int(points.width))x\(Int(points.height)) pt")
+            offerModes()
+        }
+        pendingFit = work
+        // The first size goes at once, so a booting machine starts at it.
+        let first = lock.withLock { fitted == nil }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (first ? 0 : 0.4), execute: work)
+    }
+    @MainActor private var pendingFit: DispatchWorkItem?
+
+    /// A guest pixel for each point, so the desktop's text is the size of the
+    /// app's, but at least 600 pixels on the short side, where a desktop's
+    /// windows start to fit, and at most 2560 on the long one. Multiples of 8.
+    nonisolated static func mode(fitting points: CGSize) -> crate_display_mode? {
+        let short = min(points.width, points.height), long = max(points.width, points.height)
+        guard short >= 100 else { return nil }
+        let scale = min(max(1, 600 / short), 2560 / long)
+        let round8 = { (v: CGFloat) in UInt32(max(8, (v * scale / 8).rounded() * 8)) }
+        return crate_display_mode(width: round8(points.width), height: round8(points.height))
+    }
+
+    /// The fitting size first, then the others.
+    private func list() -> [crate_display_mode] {
+        guard let fitted else { return otherModes }
+        return [fitted] + otherModes.filter { $0.width != fitted.width || $0.height != fitted.height }
+    }
+
+    /// Tells a running machine about a new fitting size.
+    private func offerModes() {
+        let offer = lock.withLock { () -> (OpaquePointer, [crate_display_mode])? in
+            guard let machine, let fitted, !otherModes.isEmpty,
+                  offered?.width != fitted.width || offered?.height != fitted.height else { return nil }
+            offered = fitted
+            return (machine, list())
+        }
+        // Outside the lock, which crate's GPU thread takes to hand over frames.
+        if let (machine, modes) = offer {
+            crate_display_set_modes(machine, index, modes, modes.count)
+        }
     }
 
     func detach() {
