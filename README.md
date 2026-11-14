@@ -9,11 +9,10 @@
 <p align="center">Full Linux distributions, desktop and all, running in virtual machines on your iPhone and iPad, entirely on the device.</p>
 
 <p align="center">
-  <img src="docs/media/desktop.png" width="49%" alt="Ubuntu's GNOME desktop with a terminal open, landscape on an iPhone Duo">
-  <img src="docs/media/kde.png" width="49%" alt="KDE Plasma's desktop with its application menu open, showing Firefox, System Settings and Dolphin, landscape on an iPhone Duo">
+  <img src="docs/media/desktop.png" width="80%" alt="Ubuntu's GNOME desktop with a terminal open, landscape on an iPhone Duo">
 </p>
 
-<p align="center"><i>Ubuntu's GNOME and KDE Plasma, landscape on an iPhone Duo.</i></p>
+<p align="center"><i>Ubuntu with GNOME, landscape on an iPhone Duo.</i></p>
 
 ## Why crate
 
@@ -76,6 +75,12 @@ with iOS 27.1.
     <td align="center" width="33%">
       <img src="docs/media/display-settings.png" alt="GNOME's Displays settings in the VM, with the resolution set to 1280 by 800"><br>
       <sub>The VM sets its own resolution: 1280 × 800 fits more on screen than the default.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/media/kde.png" alt="KDE Plasma's desktop with its application menu open, showing Firefox, System Settings and Dolphin, on an iPhone Duo"><br>
+      <sub>Arch Linux ARM with KDE Plasma, its application menu open.</sub>
     </td>
   </tr>
 </table>
