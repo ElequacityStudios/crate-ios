@@ -34,8 +34,9 @@ struct DisplayView: UIViewRepresentable {
         view.openRegion = openRegion
         if showsKeyboard, !view.isFirstResponder {
             view.becomeFirstResponder()
-        } else if !showsKeyboard, view.isFirstResponder {
-            view.resignFirstResponder()
+        } else if !showsKeyboard {
+            if view.isFirstResponder { _ = view.resignFirstResponder() }
+            view.takeHardwareKeys()
         }
     }
 
@@ -52,6 +53,9 @@ struct DisplayView: UIViewRepresentable {
         private let picture = CALayer()
         /// How much of the view's bottom the on-screen keyboard covers.
         private var keyboardOverlap: CGFloat = 0
+        /// First responder while the on-screen keyboard is down, for a
+        /// hardware keyboard's keys (takeHardwareKeys).
+        private let keyCatcher = KeyCatcher()
         /// See DisplayView.openRegion. The picture moves as the iPhone folds,
         /// and the desktop takes the shape of where it now goes.
         var openRegion: CGRect? {
@@ -72,6 +76,8 @@ struct DisplayView: UIViewRepresentable {
             picture.magnificationFilter = .linear
             layer.addSublayer(picture)
             isMultipleTouchEnabled = true
+            keyCatcher.owner = self
+            addSubview(keyCatcher)
 
             let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
             let drag = UIPanGestureRecognizer(target: self, action: #selector(dragged))
@@ -175,6 +181,8 @@ struct DisplayView: UIViewRepresentable {
         }
 
         private func point(_ recognizer: UIGestureRecognizer, buttons: UInt32) {
+            // Back from something else that took the keys, such as a sheet.
+            takeHardwareKeys()
             let rect = screenRect
             let location = recognizer.location(in: self)
             bridge.pointer(x: (location.x - rect.minX) / rect.width,
@@ -223,6 +231,19 @@ struct DisplayView: UIViewRepresentable {
         // MARK: Keys as the keyboard
 
         override var canBecomeFirstResponder: Bool { true }
+
+        /// Only a first responder gets a hardware keyboard's presses, and this
+        /// view as one brings up the on-screen keyboard too. So while that's
+        /// down, keyCatcher is first responder instead.
+        func takeHardwareKeys() {
+            guard window != nil, !isFirstResponder, !keyCatcher.isFirstResponder else { return }
+            keyCatcher.becomeFirstResponder()
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            takeHardwareKeys()
+        }
 
         /// Esc, Ctrl, Super, Tab, arrows and the rest, above the keyboard.
         private lazy var keyBar: DisplayKeyBar = {
@@ -314,6 +335,28 @@ struct DisplayView: UIViewRepresentable {
                 handled = true
             }
             return handled
+        }
+    }
+
+    /// A first responder that isn't text input, so it brings up no keyboard,
+    /// and hands its presses to ScreenView. It's left out of ScreenView's
+    /// responder chain, or UIKit would show ScreenView's key bar for it.
+    final class KeyCatcher: UIView {
+        weak var owner: ScreenView?
+
+        override var canBecomeFirstResponder: Bool { true }
+        override var next: UIResponder? { owner?.next }
+
+        override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            owner?.pressesBegan(presses, with: event)
+        }
+
+        override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            owner?.pressesEnded(presses, with: event)
+        }
+
+        override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            owner?.pressesCancelled(presses, with: event)
         }
     }
 }
