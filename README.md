@@ -63,14 +63,22 @@ with iOS 27.1.
 
 ## Gallery
 
-<p align="center">
-  <img src="docs/media/solidcraft.png" width="49%" alt="SolidCraft, a 3D CAD app, with a chair model, in Ubuntu's GNOME desktop on an iPhone Duo">
-  <img src="docs/media/chrome-gpu.png" width="49%" alt="Chrome's chrome://gpu page listing canvas, compositing, rasterization, video decode, WebGL and WebGPU as hardware accelerated">
-</p>
-
-<p align="center"><i>Left, a chair made in SolidCraft, a 3D CAD app, inside crate running Ubuntu with
-GNOME. Right, Chrome with GPU acceleration: chrome://gpu shows canvas, compositing,
-WebGL and WebGPU hardware accelerated.</i></p>
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/media/solidcraft.png" alt="SolidCraft, a 3D CAD app, with a chair model, beside a terminal where Claude Code describes the chair, in Ubuntu's GNOME desktop on an iPhone Duo"><br>
+      <sub>Claude Code, running in the VM, builds a chair in SolidCraft, a 3D CAD app, on Ubuntu with GNOME.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/media/chrome-gpu.png" alt="Chrome's chrome://gpu page listing canvas, compositing, rasterization, video decode, WebGL and WebGPU as hardware accelerated"><br>
+      <sub>Chrome with GPU acceleration: chrome://gpu shows canvas, compositing, WebGL and WebGPU on the iPhone's GPU.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/media/display-settings.png" alt="GNOME's Displays settings in the VM, with the resolution set to 1280 by 800"><br>
+      <sub>The VM sets its own resolution: 1280 × 800 fits more on screen than the default.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Roadmap
 

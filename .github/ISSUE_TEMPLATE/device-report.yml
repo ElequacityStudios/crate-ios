@@ -1,0 +1,92 @@
+name: Device report
+description: How crate ran on your iPhone or iPad, whether it worked or not.
+title: "Device report: "
+labels: [device report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        crate is tested on few devices so far, so every report helps, including "it just works". Settings > Logs > Export Logs shares a file with your device, iOS version and crate version: attach it below if you can.
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: The model, and how much memory it has if you know.
+      placeholder: iPhone 17 Pro, 12 GB
+    validations:
+      required: true
+  - type: input
+    id: ios
+    attributes:
+      label: iOS or iPadOS version
+      placeholder: "27.1"
+    validations:
+      required: true
+  - type: input
+    id: crate
+    attributes:
+      label: crate version
+      description: The release you installed, or the commit you built.
+      placeholder: v0.1
+    validations:
+      required: true
+  - type: dropdown
+    id: signing
+    attributes:
+      label: How you signed and installed it
+      options:
+        - Scripts/sign-ipa.sh, by hand
+        - Claude Code, following INSTALL.md
+        - Built and run from Xcode
+        - Another re-signing tool (say which below)
+    validations:
+      required: true
+  - type: dropdown
+    id: account
+    attributes:
+      label: Apple account
+      options:
+        - Paid Apple Developer Program
+        - Free Apple account
+    validations:
+      required: true
+  - type: dropdown
+    id: memory
+    attributes:
+      label: Memory entitlements
+      description: Settings > Memory shows "Increased limit".
+      options:
+        - Both (Increased Memory Limit and Extended Virtual Address Space)
+        - Only Increased Memory Limit
+        - Neither
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: jit
+    attributes:
+      label: How JIT was turned on
+      options:
+        - Built-in StikJIT
+        - StikDebug
+        - It didn't turn on
+    validations:
+      required: true
+  - type: input
+    id: vm
+    attributes:
+      label: VM
+      description: Which image, and the memory size you picked.
+      placeholder: Ubuntu 26.04 LTS with GNOME, 6 GB
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What worked, what didn't, and anything slow or odd. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Drag in the file from Settings > Logs > Export Logs.

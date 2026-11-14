@@ -101,7 +101,8 @@ JIT lasts until crate closes, so it's turned on again each time crate opens.
 In the Install tab, pick a distribution and a memory size, then Install; crate
 asks for the account to create in the VM. Without the memory entitlements, iOS
 gives crate less memory, so pick a smaller size: Settings > Memory shows the
-limit iOS gave it.
+limit iOS gave it. Once the desktop is up, its own display settings change the
+resolution; 1280 × 800 fits more on screen than the default.
 
 ## When something goes wrong
 
