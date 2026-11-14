@@ -44,7 +44,7 @@ Linux comes first. From the Install tab, each with an account of your own:
 | Distribution | Desktop |
 |---|---|
 | Ubuntu 26.04 LTS | GNOME, the heaviest of them, and it runs |
-| Debian 13 | KDE Plasma, Xfce, or a minimal Xfce that starts fastest |
+| Debian 13 | KDE Plasma or Xfce |
 | Arch Linux ARM | KDE Plasma or Xfce |
 
 Coming soon: Omarchy with Hyprland (it runs, with bugs left to fix), custom
@@ -153,8 +153,7 @@ built from source as dynamic frameworks the app embeds.
 The images come from
 [arm64-desktop-images](https://github.com/oneamendez/arm64-desktop-images),
 whose GitHub workflow builds and attests them: Ubuntu with GNOME, Debian with
-KDE Plasma or Xfce (and a minimal Xfce), and Arch Linux ARM with KDE Plasma or
-Xfce. Each release has a `catalog.json`
+KDE Plasma or Xfce, and Arch Linux ARM with KDE Plasma or Xfce. Each release has a `catalog.json`
 listing every image's kernel, initrd and disk (xz, in parts under 2 GiB) with
 their SHA-256s, its kernel command line, and its cloud-init vendor-data.
 
