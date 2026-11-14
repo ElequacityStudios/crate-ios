@@ -9,18 +9,11 @@
 <p align="center">Full Linux distributions, desktop and all, running in virtual machines on your iPhone and iPad, entirely on the device.</p>
 
 <p align="center">
-  <img src="docs/media/chair.jpg" width="320" alt="Ubuntu's GNOME desktop on an iPhone Duo: a CAD app with a chair model beside a terminal running Claude Code">
-  &nbsp;
-  <img src="docs/media/home.jpg" width="320" alt="crate's Home screen: cards for an Omarchy VM and an Ubuntu VM, each with its last screen, its specs and a Start button">
-</p>
-
-<p align="center"><i>Ubuntu 26.04 with GNOME on an iPhone Duo: Claude Code, running inside the VM, has designed a chair
-in a CAD app. Beside it, Home, with a card for each VM.</i></p>
-
-<p align="center">
   <img src="docs/media/desktop.png" width="49%" alt="Ubuntu's GNOME desktop with a terminal open, landscape on an iPhone Duo">
-  <img src="docs/media/console.jpg" width="49%" alt="The same VM's serial console after login, with a row of Esc, Ctrl, Tab, function and arrow keys above the iPhone keyboard">
+  <img src="docs/media/kde.png" width="49%" alt="KDE Plasma's desktop with its application menu open, showing Firefox, System Settings and Dolphin, landscape on an iPhone Duo">
 </p>
+
+<p align="center"><i>Ubuntu's GNOME and KDE Plasma, landscape on an iPhone Duo.</i></p>
 
 ## Why crate
 
@@ -53,14 +46,44 @@ Linux comes first. From the Install tab, each with an account of your own:
 | Ubuntu 26.04 LTS | GNOME, the heaviest of them, and it runs |
 | Debian 13 | KDE Plasma, Xfce, or a minimal Xfce that starts fastest |
 | Arch Linux ARM | KDE Plasma or Xfce |
-| Omarchy | Hyprland |
 
-Support for other operating systems is coming.
+Coming soon: Omarchy with Hyprland (it runs, with bugs left to fix), custom
+Linux images of your own, and other operating systems.
 
 crate needs JIT, which iOS gives only to an app a debugger has attached to. So
 it can't come from the App Store: it's installed with a development signature
 and JIT is turned on by StikDebug or crate's own built-in StikJIT (see
 [JIT](#jit)). It's developed on an iPhone Duo with iOS 27.1.
+
+## Gallery
+
+<p align="center">
+  <img src="docs/media/solidcraft.png" width="49%" alt="SolidCraft, a 3D CAD app, with a chair model, in Ubuntu's GNOME desktop on an iPhone Duo">
+  <img src="docs/media/chrome-gpu.png" width="49%" alt="Chrome's chrome://gpu page listing canvas, compositing, rasterization, video decode, WebGL and WebGPU as hardware accelerated">
+</p>
+
+<p align="center"><i>Left, a chair made in SolidCraft, a 3D CAD app, inside crate running Ubuntu with
+GNOME. Right, Chrome with GPU acceleration: chrome://gpu shows canvas, compositing,
+WebGL and WebGPU hardware accelerated.</i></p>
+
+## Roadmap
+
+Speed comes first. Every VM runs on the
+[crate engine](https://github.com/oneamendez/crate), so the engine's speed is
+the whole app's speed, and that's where help counts most: contributions to the
+engine go to its repository.
+
+1. **Speed.** Faster translation, startup and graphics in the engine, measured
+   by real benchmarks: timings of what people actually do, such as booting to a
+   desktop, opening apps and building code, on the iPhone itself, so every
+   change shows what it gains. Today's numbers are in the engine's
+   [benchmarks](https://github.com/oneamendez/crate#benchmarks).
+2. **Monitors and devices.** An external monitor as the VM's screen, and the
+   keyboards, mice, game controllers, cameras, microphones, USB storage and
+   other devices iOS lets an app reach, passed through to the VM; the other
+   way, the VM's sound, clipboard and files reaching iOS.
+3. **More systems.** Omarchy back in the catalog once its bugs are fixed,
+   custom Linux images of your own, then other operating systems.
 
 ## The app
 
@@ -75,8 +98,8 @@ Three tabs:
   menu has the VM's settings (on iPhone Duo) and Delete.
 - **Install Vms**: the images the catalog lists, a memory limit, and Install,
   which asks for the account to make in the VM.
-- **Settings**: JIT, memory, logs, and a UI Preview section that flips the
-  stubs.
+- **Settings**: JIT, memory, logs, and Acknowledgements: the licenses of
+  crate and of everything it carries.
 
 ## JIT
 
@@ -117,6 +140,10 @@ and Super hold for the next key, from the row or either keyboard. Take
 Screenshot, in the toolbar's overflow menu, saves the VM's frame at its own
 size to Photos and offers it to share.
 
+<p align="center">
+  <img src="docs/media/console.jpg" width="600" alt="A VM's serial console after login, with a row of Esc, Ctrl, Tab, function and arrow keys above the iPhone keyboard">
+</p>
+
 On iPhone Duo the VM screen's toolbar goes down the side, where iOS puts bars
 there, and drops the title, which would take a strip of height. When the
 keyboard leaves the bar short of room, the display/console switch goes into its
@@ -130,8 +157,8 @@ the hinge and the fold to `crate.log` for checking on the device.
 The images come from
 [arm64-desktop-images](https://github.com/oneamendez/arm64-desktop-images),
 whose GitHub workflow builds and attests them: Ubuntu with GNOME, Debian with
-KDE Plasma or Xfce (and a minimal Xfce), Arch Linux ARM with KDE Plasma or
-Xfce, and Omarchy with Hyprland. Each release has a `catalog.json`
+KDE Plasma or Xfce (and a minimal Xfce), and Arch Linux ARM with KDE Plasma or
+Xfce. Each release has a `catalog.json`
 listing every image's kernel, initrd and disk (xz, in parts under 2 GiB) with
 their SHA-256s, its kernel command line, and its cloud-init vendor-data.
 
@@ -227,3 +254,25 @@ turning JIT on needs.
   booted, and an upgrade can remove the modules the booted kernel needs.
 - **Xfce doesn't follow a new screen size.** On rotate or fold, labwc takes
   the new size but the Xfce panel and desktop don't (see crate's docs/PLAN.md).
+
+## License
+
+crate's own code is [MPL-2.0](LICENSE), like the
+[crate engine](https://github.com/oneamendez/crate): changes to crate's files
+stay open, and it can be combined with code under other licenses. What the app
+carries from other projects keeps its own license:
+[StikJIT](https://github.com/StikDebug/StikJIT) (MPL-2.0),
+[idevice](https://github.com/jkcoxson/idevice) and
+[SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT),
+[libslirp](https://gitlab.freedesktop.org/slirp/libslirp) (BSD-3-Clause),
+[GLib](https://gitlab.gnome.org/GNOME/glib) (LGPL-2.1-or-later, kept as its own
+replaceable framework), [MoltenVK](https://github.com/KhronosGroup/MoltenVK)
+(Apache-2.0), [ANGLE](https://chromium.googlesource.com/angle/angle)
+(BSD-3-Clause), [libepoxy](https://github.com/anholt/libepoxy) and
+[virglrenderer](https://gitlab.freedesktop.org/virgl/virglrenderer) (MIT), and
+what they in turn are built from. [docs/PROVENANCE.md](docs/PROVENANCE.md) says
+where each comes from and how it's built, and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) has every license's text
+(`Scripts/third-party-notices.py` writes it). JIT is turned on with
+[StikDebug](https://github.com/StikDebug/StikDebug)'s convention, and the VM
+images are each distribution's own, under their licenses.
