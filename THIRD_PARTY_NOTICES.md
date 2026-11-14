@@ -8,7 +8,7 @@ piece is fetched or built.
 
 | Component | Version | License | Source | In the app |
 |---|---|---|---|---|
-| crate | v0.1.0 | MPL-2.0 | https://github.com/oneamendez/crate/tree/v0.1.0 | the VM engine, linked into the app |
+| crate | v0.1.1 | MPL-2.0 | https://github.com/oneamendez/crate/tree/v0.1.1 | the VM engine, linked into the app |
 | StikJIT | 2.0.1 | MPL-2.0 | https://github.com/StikDebug/StikJIT/tree/2.0.1 | the JIT helper's framework, from its release; it carries its own build of idevice |
 | idevice | 0.1.68 | MIT | https://github.com/jkcoxson/idevice | linked into the app, built with one patch |
 | SwiftTerm | 1.18.0 | MIT | https://github.com/migueldeicaza/SwiftTerm | linked into the app |

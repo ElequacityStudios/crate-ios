@@ -10,8 +10,8 @@
 #
 #     ./Scripts/fetch-frameworks.sh
 #
-# This repository is private, so the download needs a token that can read it:
-# GH_TOKEN, or else gh's login as oneamendez on this Mac.
+# VERIFY_ATTESTATION=1 also checks, with gh, that this repository's frameworks
+# workflow built the zip (the ipa workflow sets it).
 set -euo pipefail
 
 VERSION=frameworks-2026.11.13
@@ -26,9 +26,14 @@ fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-export GH_TOKEN="${GH_TOKEN:-$(gh auth token -u oneamendez)}"
-gh release download "$VERSION" -R oneamendez/crate-ios -p Frameworks.zip -D "$WORK"
+curl --fail --location --silent --show-error --output "$WORK/Frameworks.zip" \
+    "https://github.com/oneamendez/crate-ios/releases/download/$VERSION/Frameworks.zip"
 echo "$SHA256  $WORK/Frameworks.zip" | shasum -a 256 --check --quiet
+if [ "${VERIFY_ATTESTATION:-}" = 1 ]; then
+    gh attestation verify "$WORK/Frameworks.zip" --repo oneamendez/crate-ios \
+        --signer-workflow oneamendez/crate-ios/.github/workflows/frameworks.yml >/dev/null
+    echo "frameworks $VERSION: attested by the frameworks workflow"
+fi
 ditto -x -k "$WORK/Frameworks.zip" "$WORK/out"
 mkdir -p "$DEST"
 for item in "$WORK"/out/Frameworks/*; do

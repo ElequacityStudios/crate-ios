@@ -35,7 +35,9 @@ jobs:
       - run: brew install xcodegen
       - name: Frameworks
         env:
+          # For gh, checking each pinned release's attestation.
           GH_TOKEN: ${{ github.token }}
+          VERIFY_ATTESTATION: 1
         run: |
           Scripts/fetch-frameworks.sh
           Scripts/fetch-stikjit.sh

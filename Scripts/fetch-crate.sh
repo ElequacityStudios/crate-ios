@@ -10,12 +10,14 @@
 #
 #     ./Scripts/fetch-crate.sh
 #
-# CRATE_ZIP=path uses a zip made by crate's tools/xcframework.sh instead of
-# downloading, with CRATE_SHA256 its hash, to try a build before it's released.
+# VERIFY_ATTESTATION=1 also checks, with gh, that crate's release workflow
+# built the zip (the ipa workflow sets it). CRATE_ZIP=path uses a zip made by
+# crate's tools/xcframework.sh instead of downloading, with CRATE_SHA256 its
+# hash, to try a build before it's released.
 set -euo pipefail
 
-VERSION=v0.1.0
-SHA256=c9008755614e25d62e488bbfaec2614047db3247056d95949cc2820f3119342c
+VERSION=v0.1.1
+SHA256=52fab3b7729feb4937566b9e4874cbf31e437626c46bb09295b56a1d0c9ea6ad
 SHA256="${CRATE_SHA256:-$SHA256}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,6 +38,11 @@ else
         "https://github.com/oneamendez/crate/releases/download/$VERSION/Crate.xcframework.zip"
 fi
 echo "$SHA256  $WORK/Crate.xcframework.zip" | shasum -a 256 --check --quiet
+if [ "${VERIFY_ATTESTATION:-}" = 1 ]; then
+    gh attestation verify "$WORK/Crate.xcframework.zip" --repo oneamendez/crate \
+        --signer-workflow oneamendez/crate/.github/workflows/release.yml >/dev/null
+    echo "crate $VERSION: attested by crate's release workflow"
+fi
 mkdir "$WORK/out"
 ditto -x -k "$WORK/Crate.xcframework.zip" "$WORK/out"
 [ -d "$WORK/out/Crate.xcframework" ] || { echo "no Crate.xcframework in the zip" >&2; exit 1; }

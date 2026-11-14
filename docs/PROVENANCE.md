@@ -12,7 +12,7 @@ down to the Rust libraries.
 
 | Piece | Version | License | From | How |
 | --- | --- | --- | --- | --- |
-| [crate](https://github.com/oneamendez/crate) | v0.1.0 | MPL-2.0 | its release | `fetch-crate.sh`, or `build-crate.sh` from a checkout |
+| [crate](https://github.com/oneamendez/crate) | v0.1.1 | MPL-2.0 | its release, attested | `fetch-crate.sh`, or `build-crate.sh` from a checkout |
 | [StikJIT](https://github.com/StikDebug/StikJIT) | 2.0.1 | MPL-2.0 | its release's framework | `fetch-stikjit.sh` |
 | [idevice](https://github.com/jkcoxson/idevice) | 0.1.68 | MIT | its source | `build-idevice.sh`, one patch |
 | [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | 1.18.0 | MIT | Swift package | Xcode |

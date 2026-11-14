@@ -174,7 +174,7 @@ pinned to a release and checked against its SHA-256:
 
     ./Scripts/fetch-frameworks.sh  # idevice, libslirp and GLib, the GPU stack
     ./Scripts/fetch-stikjit.sh     # StikJIT 2.0.1
-    ./Scripts/fetch-crate.sh       # crate v0.1.0
+    ./Scripts/fetch-crate.sh       # crate v0.1.1
     xcodegen generate
     open Crate.xcodeproj
 
@@ -193,9 +193,9 @@ With `--jit=on` the Simulator has no code region, so starting a VM pretends: its
 screenshot becomes the display, and the console shows a login prompt that
 echoes typing.
 
-This repository is private, so its frameworks release downloads as gh's login
-for oneamendez, or with `GH_TOKEN`. To change crate and the app at once, build
-crate from a checkout instead of fetching it:
+`VERIFY_ATTESTATION=1` makes the crate and frameworks fetches also check, with
+gh, that each release's own workflow built it. To change crate and the app at
+once, build crate from a checkout instead of fetching it:
 
     ./Scripts/build-crate.sh       # crate from ~/Repos/crate (CRATE_DIR); needs Rust
 
