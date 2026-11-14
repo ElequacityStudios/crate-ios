@@ -103,7 +103,9 @@ targets:
           mkdir -p "$DEST"
           for name in $NAMES; do
             rsync -a --delete "$SRC/$name.framework" "$DEST/"
-            codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DEST/$name.framework"
+            # Unsigned (the ipa workflow): Scripts/sign-ipa.sh signs them.
+            [ -z "$EXPANDED_CODE_SIGN_IDENTITY" ] ||
+              codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DEST/$name.framework"
           done
     entitlements:
       path: Resources/Crate.entitlements
@@ -171,7 +173,9 @@ targets:
           DEST="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
           mkdir -p "$DEST"
           rsync -a --delete "$SRC" "$DEST/"
-          codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DEST/StikJIT.framework"
+          # Unsigned (the ipa workflow): Scripts/sign-ipa.sh signs it.
+          [ -z "$EXPANDED_CODE_SIGN_IDENTITY" ] ||
+            codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DEST/StikJIT.framework"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.amendez.crate.jithelper

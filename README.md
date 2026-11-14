@@ -95,15 +95,12 @@ own GL messages; with `CRATE_LOG=debug`, its debug lines.
 
 ## Build
 
-The libraries are fetched or built into `Frameworks/`, which isn't committed:
+The libraries go into `Frameworks/`, which isn't committed. Fetch them, each
+pinned to a release and checked against its SHA-256:
 
-    ./Scripts/fetch-stikjit.sh     # StikJIT 2.0.1, checked against its SHA-256
-    ./Scripts/build-idevice.sh     # idevice v0.1.68 from source; needs Rust
-    ./Scripts/build-crate.sh       # crate from ~/Repos/crate; needs Rust
-    ./Scripts/build-slirp.sh       # libslirp 4.9.7 and GLib 2.90.1; needs meson
-    ./Scripts/build-moltenvk.sh    # MoltenVK 1.4.2; about 15 minutes
-    ./Scripts/build-angle.sh       # ANGLE; a 4 GB checkout, ANGLE_SRC reuses one
-    ./Scripts/build-virgl.sh       # libepoxy 1.5.10 and virglrenderer 1.3.0
+    ./Scripts/fetch-frameworks.sh  # idevice, libslirp and GLib, the GPU stack
+    ./Scripts/fetch-stikjit.sh     # StikJIT 2.0.1
+    ./Scripts/fetch-crate.sh       # crate v0.1.0
     xcodegen generate
     open Crate.xcodeproj
 
@@ -121,6 +118,41 @@ Launch arguments show one state without tapping to it:
 With `--jit=on` the Simulator has no code region, so starting a VM pretends: its
 screenshot becomes the display, and the console shows a login prompt that
 echoes typing.
+
+This repository is private, so its frameworks release downloads as gh's login
+for oneamendez, or with `GH_TOKEN`. To change crate and the app at once, build
+crate from a checkout instead of fetching it:
+
+    ./Scripts/build-crate.sh       # crate from ~/Repos/crate (CRATE_DIR); needs Rust
+
+The frameworks release is these scripts' output; build them to change one, and
+publish a new release with `./Scripts/release-frameworks.sh TAG`, then pin the
+`VERSION` and `SHA256` it prints in `fetch-frameworks.sh`:
+
+    ./Scripts/build-idevice.sh     # idevice v0.1.68 from source; needs Rust
+    ./Scripts/build-slirp.sh       # libslirp 4.9.7 and GLib 2.90.1; needs meson
+    ./Scripts/build-moltenvk.sh    # MoltenVK 1.4.2; about 15 minutes
+    ./Scripts/build-angle.sh       # ANGLE; a 4 GB checkout, ANGLE_SRC reuses one
+    ./Scripts/build-virgl.sh       # libepoxy 1.5.10 and virglrenderer 1.3.0
+
+Once this repository is public, the `frameworks` workflow, run by hand, does
+the same on GitHub: it builds them all, publishes the release with an
+attestation, and shows the lines to pin. While the repository is private it
+skips itself.
+
+### IPA
+
+The `ipa` workflow builds an unsigned IPA from the same pinned libraries: run
+by hand it's a workflow artifact, and a version tag (`vX.Y`) makes it a release.
+`./Scripts/build-ipa.sh` builds the same IPA on a Mac. Sign it with this team's
+certificate and profiles, and install it:
+
+    ./Scripts/sign-ipa.sh crate-unsigned.ipa                # crate-signed.ipa beside it
+    ./Scripts/sign-ipa.sh crate-unsigned.ipa --install UDID
+
+The app's own profile has to grant both memory entitlements; Xcode makes it on
+a first build with automatic signing. Both bundles get `get-task-allow`, which
+turning JIT on needs.
 
 ## Known issues
 

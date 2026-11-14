@@ -1,0 +1,55 @@
+# Builds the frameworks the app links (idevice, libslirp and GLib, and the GPU
+# stack: MoltenVK, ANGLE, libepoxy, virglrenderer) from source with the
+# Scripts/build-*.sh scripts, and publishes them as a frameworks release with
+# Scripts/release-frameworks.sh, attested: the release Scripts/fetch-frameworks.sh
+# and the ipa workflow fetch. Pin the VERSION and SHA256 it prints there.
+#
+# Run by hand, when a build script or a patch changes. It does nothing while
+# this repository is private: a run is long (ANGLE is a 4 GB checkout) and
+# macOS minutes on a private repository count tenfold.
+name: frameworks
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (default frameworks-YYYY.MM.DD, today in UTC)
+        required: false
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  frameworks:
+    if: github.event.repository.visibility == 'public'
+    runs-on: xcode-27
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      - run: brew install meson pkg-config
+      - run: Scripts/build-idevice.sh
+      - run: Scripts/build-slirp.sh
+      - run: Scripts/build-moltenvk.sh
+      - run: Scripts/build-angle.sh
+      - run: Scripts/build-virgl.sh
+      - name: Release
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          tag="${TAG:-frameworks-$(date -u +%Y.%m.%d)}"
+          Scripts/release-frameworks.sh "$tag" | tee "$RUNNER_TEMP/pin.txt"
+          {
+              echo "Pin it in Scripts/fetch-frameworks.sh:"
+              echo '```'
+              grep -E '^(VERSION|SHA256)=' "$RUNNER_TEMP/pin.txt"
+              echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" -p Frameworks.zip -D "$RUNNER_TEMP/release"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ runner.temp }}/release/Frameworks.zip

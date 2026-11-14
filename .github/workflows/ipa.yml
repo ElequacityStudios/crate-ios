@@ -1,0 +1,72 @@
+# Builds crate as an unsigned IPA (Scripts/build-ipa.sh): run by hand, as a
+# workflow artifact; on a version tag (vX.Y), as a release. Install it with
+# Scripts/sign-ipa.sh, which signs it with this team's certificate and
+# profiles, or sign it with any other.
+#
+# The libraries come prebuilt and pinned, as Scripts/fetch-*.sh get them on a
+# Mac: the frameworks release of this repository, and StikJIT's and crate's own
+# releases.
+name: ipa
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ipa:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag is the app's version
+        if: github.ref_type == 'tag'
+        run: |
+          versions=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"$/\1/p' project.yml | sort -u)
+          [ "$GITHUB_REF_NAME" = "v$versions" ] || {
+              echo "tag $GITHUB_REF_NAME, but project.yml says $versions" >&2; exit 1; }
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      - run: brew install xcodegen
+      - name: Frameworks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Scripts/fetch-frameworks.sh
+          Scripts/fetch-stikjit.sh
+          Scripts/fetch-crate.sh
+      - name: Build
+        run: |
+          Scripts/build-ipa.sh "$RUNNER_TEMP/out/crate-unsigned.ipa"
+          cd "$RUNNER_TEMP/out"
+          shasum -a 256 crate-unsigned.ipa | tee crate-unsigned.ipa.sha256
+      - if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: crate-unsigned
+          path: |
+            ${{ runner.temp }}/out/crate-unsigned.ipa
+            ${{ runner.temp }}/out/crate-unsigned.ipa.sha256
+      - name: Release
+        if: github.ref_type == 'tag'
+        working-directory: ${{ runner.temp }}/out
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          crate $GITHUB_REF_NAME for iPhone and iPad, unsigned, built from $GITHUB_SHA
+          with crate $(cat "$GITHUB_WORKSPACE/Frameworks/Crate.version") and frameworks
+          $(cat "$GITHUB_WORKSPACE/Frameworks/Frameworks.version").
+
+          Sign it before installing: \`Scripts/sign-ipa.sh crate-unsigned.ipa\`
+          uses this team's certificate and profiles. Turning JIT on needs the two
+          memory entitlements and get-task-allow.
+
+              SHA-256 $(cut -d' ' -f1 crate-unsigned.ipa.sha256)
+          EOF
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "crate $GITHUB_REF_NAME" --notes-file notes.md \
+              crate-unsigned.ipa crate-unsigned.ipa.sha256
