@@ -65,14 +65,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # One line a paragraph: GitHub shows every newline in release notes.
           cat > notes.md <<EOF
-          crate $GITHUB_REF_NAME for iPhone and iPad, unsigned, built from $GITHUB_SHA
-          with crate $(cat "$GITHUB_WORKSPACE/Frameworks/Crate.version") and frameworks
-          $(cat "$GITHUB_WORKSPACE/Frameworks/Frameworks.version").
+          crate $GITHUB_REF_NAME for iPhone and iPad, unsigned: sign it with your own Apple account, then install it. [INSTALL.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/INSTALL.md) has the steps, and a request to paste into Claude Code, which does them for you.
 
-          Sign it before installing: \`Scripts/sign-ipa.sh crate-unsigned.ipa\`
-          uses this team's certificate and profiles. Turning JIT on needs the two
-          memory entitlements and get-task-allow.
+          Built from $GITHUB_SHA with crate $(cat "$GITHUB_WORKSPACE/Frameworks/Crate.version") and $(cat "$GITHUB_WORKSPACE/Frameworks/Frameworks.version"), each attested. To check where this IPA came from: \`gh attestation verify crate-unsigned.ipa --repo $GITHUB_REPOSITORY\`
 
               SHA-256 $(cut -d' ' -f1 crate-unsigned.ipa.sha256)
           EOF

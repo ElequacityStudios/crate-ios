@@ -50,10 +50,16 @@ Linux comes first. From the Install tab, each with an account of your own:
 Coming soon: Omarchy with Hyprland (it runs, with bugs left to fix), custom
 Linux images of your own, and other operating systems.
 
-crate needs JIT, which iOS gives only to an app a debugger has attached to. So
-it can't come from the App Store: it's installed with a development signature
-and JIT is turned on by StikDebug or crate's own built-in StikJIT (see
-[JIT](#jit)). It's developed on an iPhone Duo with iOS 27.1.
+## Install
+
+crate needs JIT, which iOS gives only to an app a debugger has attached to, so
+it can't come from the App Store. Each
+[release](https://github.com/oneamendez/crate-ios/releases) has an unsigned
+IPA instead, which you sign with your own Apple account and install from a Mac;
+JIT is then turned on by crate's built-in StikJIT or by StikDebug (see
+[JIT](#jit)). [INSTALL.md](INSTALL.md) has the steps, and a request to paste
+into Claude Code, which does them for you. crate is developed on an iPhone Duo
+with iOS 27.1.
 
 ## Gallery
 
@@ -134,7 +140,7 @@ user-mode, through [libslirp](https://gitlab.freedesktop.org/slirp/libslirp)
 (BSD-3-Clause) and [GLib](https://gitlab.gnome.org/GNOME/glib) (LGPL-2.1-or-later),
 built from source as dynamic frameworks the app embeds.
 
-## Installs
+## VM images
 
 The images come from
 [arm64-desktop-images](https://github.com/oneamendez/arm64-desktop-images),
@@ -218,15 +224,16 @@ skips itself.
 
 The `ipa` workflow builds an unsigned IPA from the same pinned libraries: run
 by hand it's a workflow artifact, and a version tag (`vX.Y`) makes it a release.
-`./Scripts/build-ipa.sh` builds the same IPA on a Mac. Sign it with this team's
-certificate and profiles, and install it:
+`./Scripts/build-ipa.sh` builds the same IPA on a Mac. `Scripts/sign-ipa.sh`
+signs it with your own certificate and profiles under your bundle ID, as
+[INSTALL.md](INSTALL.md) describes, and can install it:
 
-    ./Scripts/sign-ipa.sh crate-unsigned.ipa                # crate-signed.ipa beside it
-    ./Scripts/sign-ipa.sh crate-unsigned.ipa --install UDID
+    BUNDLE_ID=com.you.crate ./Scripts/sign-ipa.sh crate-unsigned.ipa                # crate-signed.ipa beside it
+    BUNDLE_ID=com.you.crate ./Scripts/sign-ipa.sh crate-unsigned.ipa --install UDID
 
-The app's own profile has to grant both memory entitlements; Xcode makes it on
-a first build with automatic signing. Both bundles get `get-task-allow`, which
-turning JIT on needs.
+Both bundles get `get-task-allow`, which turning JIT on needs, and the app the
+two memory entitlements when its profile grants them. Unset, `BUNDLE_ID` is
+this project's own, `com.amendez.crate`.
 
 ## Known issues
 
