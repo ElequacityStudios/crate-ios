@@ -134,24 +134,6 @@ user-mode, through [libslirp](https://gitlab.freedesktop.org/slirp/libslirp)
 (BSD-3-Clause) and [GLib](https://gitlab.gnome.org/GNOME/glib) (LGPL-2.1-or-later),
 built from source as dynamic frameworks the app embeds.
 
-Above the display's keyboard is a row of the keys an iPhone keyboard lacks:
-Esc, Ctrl, Super, Tab, function keys and arrows, sent as Linux key codes; Ctrl
-and Super hold for the next key, from the row or either keyboard. Take
-Screenshot, in the toolbar's overflow menu, saves the VM's frame at its own
-size to Photos and offers it to share.
-
-<p align="center">
-  <img src="docs/media/console.jpg" width="600" alt="A VM's serial console after login, with a row of Esc, Ctrl, Tab, function and arrow keys above the iPhone keyboard">
-</p>
-
-On iPhone Duo the VM screen's toolbar goes down the side, where iOS puts bars
-there, and drops the title, which would take a strip of height. When the
-keyboard leaves the bar short of room, the display/console switch goes into its
-overflow menu before the keyboard button does. Folded like a laptop, the display or
-console moves above the fold, and the console brings the keyboard up below it.
-Folded like a book, both span the fold. The Simulator can't fold, so crate logs
-the hinge and the fold to `crate.log` for checking on the device.
-
 ## Installs
 
 The images come from
