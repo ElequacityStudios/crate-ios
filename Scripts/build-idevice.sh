@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Build idevice's C library (github.com/jkcoxson/idevice, MIT) from source, at a pinned
 # release, as Frameworks/IDevice.xcframework: what crate's app links to pair this iPhone with
 # itself (iOS 27's device-initiated pairing) for Built-in StikJIT. StikJIT carries its own copy

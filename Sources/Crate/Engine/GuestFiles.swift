@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import Foundation
 
 /// Where a VM's guest lives: the kernel, its initial ramdisk, and the disk, in
@@ -31,10 +35,5 @@ struct GuestFiles {
     /// Deletes the VM's folder and everything in it.
     func remove() {
         try? FileManager.default.removeItem(at: directory)
-    }
-
-    /// Deletes every VM's files.
-    static func removeAll() {
-        try? FileManager.default.removeItem(at: root)
     }
 }

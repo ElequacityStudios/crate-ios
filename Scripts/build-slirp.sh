@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Build libslirp (BSD-3-Clause) and the GLib it needs (LGPL-2.1-or-later) from
 # their releases' sources, as Frameworks/Slirp.xcframework and
 # Frameworks/GLib.xcframework: the VM's user-mode networking. crate calls

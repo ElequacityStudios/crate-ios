@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Build ANGLE (BSD-3-Clause), Google's OpenGL ES on top of Vulkan, from upstream
 # source, as Frameworks/GPU/EGL.framework and GLESv2.framework: the GL the
 # VM's 3D is drawn with. crate opens EGL.framework when a machine has a 3D

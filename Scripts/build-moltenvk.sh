@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Build MoltenVK (Apache-2.0), Khronos's Vulkan on Metal, from its release's
 # source, as Frameworks/GPU/MoltenVK.framework: what ANGLE renders the VM's 3D
 # on. See Scripts/build-angle.sh for why ANGLE runs on Vulkan rather than on

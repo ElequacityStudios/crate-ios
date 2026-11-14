@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Sign an unsigned crate IPA (the ipa workflow's) with this Mac's development
 # certificate and team profiles, as Xcode signs a Debug build, and optionally
 # install it on an iPhone.

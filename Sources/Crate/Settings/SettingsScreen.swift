@@ -1,10 +1,12 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import SwiftUI
 
-/// JIT, memory and logs, then the stand-ins for what isn't wired in yet.
+/// JIT, memory, logs and the licenses.
 struct SettingsScreen: View {
-    @Environment(MachineStore.self) private var store
     @Environment(JITSession.self) private var jit
-    @Environment(MachineRunner.self) private var runner
 
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
     @AppStorage(SettingsKey.jitAtLaunch) private var jitAtLaunch = true
@@ -12,7 +14,6 @@ struct SettingsScreen: View {
 
     @State private var memory = MemoryReport()
     @State private var logURL: URL?
-    @State private var confirmingRemoveAll = false
     @ScaledMetric(relativeTo: .body) private var statusDotSize = 9
 
     var body: some View {
@@ -21,9 +22,7 @@ struct SettingsScreen: View {
                 jitSection
                 memorySection
                 logsSection
-                #if DEBUG
-                previewSection
-                #endif
+                aboutSection
             }
             .navigationTitle("Settings")
             .task { await refreshMemory() }
@@ -181,28 +180,15 @@ struct SettingsScreen: View {
         }
     }
 
-    // MARK: - UI preview
+    // MARK: - About
 
-    /// STUB controls, for seeing every state of the UI before the parts behind
-    /// it exist. Debug builds only; remove once JIT and installs are real.
-    private var previewSection: some View {
+    private var aboutSection: some View {
         Section {
-            Toggle("Pretend JIT Is On", isOn: Bindable(jit).pretending)
-            Button("Restore Sample VMs") { store.restoreSamples() }
-            Button("Remove All VMs", role: .destructive) { confirmingRemoveAll = true }
-                .confirmationDialog("Remove all VMs?", isPresented: $confirmingRemoveAll,
-                                    titleVisibility: .visible) {
-                    Button("Remove All VMs", role: .destructive) {
-                        runner.stop()
-                        store.deleteAll()
-                    }
-                } message: {
-                    Text("Their disks are removed from this iPhone. This can't be undone.")
-                }
+            NavigationLink("Acknowledgements") { AcknowledgementsScreen() }
         } header: {
-            Text("UI Preview")
+            Text("About")
         } footer: {
-            Text("Stand-ins for parts that aren't wired in yet. Pretending JIT is on shows the screens that need it.")
+            Text("crate is open source under the MPL-2.0, and carries code from other projects under their own licenses.")
         }
     }
 }

@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Fetch crate, the VM engine, as Frameworks/Crate.xcframework: the release of
 # github.com/oneamendez/crate pinned below, checked against its SHA-256, so
 # moving to another engine is a commit here. Imported in Swift as `CrateEngine`.

@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Fetch the frameworks the app builds with (idevice, libslirp and GLib, and the
 # GPU stack) from the release of this repository pinned below, checked against
 # its SHA-256, instead of building them. Scripts/release-frameworks.sh made it

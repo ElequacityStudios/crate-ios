@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import Foundation
 import Observation
 
@@ -67,12 +71,6 @@ final class MachineStore {
     /// An empty list, for previewing the UI (`--empty`): the VMs' files stay.
     func removeAll() {
         machines = []
-    }
-
-    /// Every VM gone, files and all, along with any the list no longer names.
-    func deleteAll() {
-        removeAll()
-        GuestFiles.removeAll()
     }
 
     /// Deletes VM folders no VM in the list names: what an install that was

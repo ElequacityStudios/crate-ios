@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import Foundation
 import Observation
 
@@ -193,7 +197,7 @@ final class JITSession {
     // MARK: - UI preview
 
     /// Debug builds only: pretend JIT is on, to see the screens that need it
-    /// without a debugger. Set from Settings > UI Preview or `--jit=on`.
+    /// without a debugger. Set by the `--jit=on` launch argument.
     var pretending: Bool = JITSession.storedPretending {
         didSet { UserDefaults.standard.set(pretending, forKey: SettingsKey.previewJIT) }
     }

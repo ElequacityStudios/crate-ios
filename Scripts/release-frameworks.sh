@@ -1,4 +1,8 @@
 #!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Publish the frameworks built on this Mac (idevice, libslirp and GLib, and the
 # GPU stack: MoltenVK, ANGLE, libepoxy, virglrenderer) as one zip, a release of
 # this repository, so Scripts/fetch-frameworks.sh and the ipa workflow get them
