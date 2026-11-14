@@ -33,8 +33,8 @@ targets:
       path: Resources/Info.plist
       properties:
         CFBundleDisplayName: crate
-        CFBundleShortVersionString: "0.1"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # The system's grouped background, as Home's, so launch doesn't flash
         # white before the first screen (HIG: Launching).
         UILaunchScreen:
@@ -125,8 +125,8 @@ targets:
         DEVELOPMENT_TEAM: L29MY952CB
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Development
-        MARKETING_VERSION: "0.1.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.1.2"
+        CURRENT_PROJECT_VERSION: "3"
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The code region is claimed in C (a `brk` with arguments in x0 and x1).
@@ -154,8 +154,8 @@ targets:
       path: Resources/JITHelper-Info.plist
       properties:
         CFBundleDisplayName: crate JIT helper
-        CFBundleShortVersionString: "0.1"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           # Apple's AR viewer point, with a rule nothing matches: no app or
           # share sheet ever offers it, and crate starts it by bundle ID.
@@ -187,8 +187,8 @@ targets:
         DEVELOPMENT_TEAM: L29MY952CB
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Development
-        MARKETING_VERSION: "0.1.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.1.2"
+        CURRENT_PROJECT_VERSION: "3"
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         APPLICATION_EXTENSION_API_ONLY: YES
