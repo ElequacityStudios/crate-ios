@@ -14,8 +14,8 @@
 # workflow built the zip (the ipa workflow sets it).
 set -euo pipefail
 
-VERSION=frameworks-2026.11.13
-SHA256=585817460ab5f47b9782339e62d7e27731536096518863ef305a6696d1595be9
+VERSION=frameworks-2026.11.14
+SHA256=0c7d5d9527cb8b25b9a2800333e5588b61410cd3c342264037deafbdd8ecb3e7
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$REPO/Frameworks"
