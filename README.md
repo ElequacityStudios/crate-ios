@@ -1,4 +1,68 @@
-# crate
+<p align="center">
+  <img src="docs/media/icon.png" width="128" height="128" alt="crate's icon: an open wooden crate holding three app windows">
+</p>
+
+<h1 align="center">crate</h1>
+
+<p align="center"><b>C</b>ompact <b>R</b>untime for <b>A</b>rm64 <b>T</b>ranslation and <b>E</b>mulation</p>
+
+<p align="center">Full Linux distributions, desktop and all, running in virtual machines on your iPhone and iPad, entirely on the device.</p>
+
+<p align="center">
+  <img src="docs/media/chair.jpg" width="320" alt="Ubuntu's GNOME desktop on an iPhone Duo: a CAD app with a chair model beside a terminal running Claude Code">
+  &nbsp;
+  <img src="docs/media/home.jpg" width="320" alt="crate's Home screen: cards for an Omarchy VM and an Ubuntu VM, each with its last screen, its specs and a Start button">
+</p>
+
+<p align="center"><i>Ubuntu 26.04 with GNOME on an iPhone Duo: Claude Code, running inside the VM, has designed a chair
+in a CAD app. Beside it, Home, with a card for each VM.</i></p>
+
+<p align="center">
+  <img src="docs/media/desktop.png" width="49%" alt="Ubuntu's GNOME desktop with a terminal open, landscape on an iPhone Duo">
+  <img src="docs/media/console.jpg" width="49%" alt="The same VM's serial console after login, with a row of Esc, Ctrl, Tab, function and arrow keys above the iPhone keyboard">
+</p>
+
+## Why crate
+
+- **A real computer in your pocket.** Not a remote desktop or a cloud VM:
+  the whole operating system runs on the iPhone, works offline, and your files
+  stay on it.
+- **Real distributions.** Stock arm64 Linux with its own package manager, so
+  the software you'd run on an Arm laptop or server installs as it is: a
+  browser, developer tools, coding agents like Claude Code, CAD apps.
+- **Built for speed.** We built crate to be fast, from the engine up. The
+  [crate engine](https://github.com/oneamendez/crate) is written from scratch
+  in Rust: an arm64-to-arm64 translator that copies most guest instructions
+  into host code as they are and rewrites only what touches the machine. On a
+  Mac, a benchmark pass that takes QEMU's TCG 130.5 s takes crate 24.5 s; the
+  rest of the timings, the iPhone's included, are in the engine's
+  [benchmarks](https://github.com/oneamendez/crate#benchmarks).
+- **GPU-accelerated.** The guest's OpenGL runs on the iPhone's GPU, through
+  virglrenderer, ANGLE and MoltenVK: desktops composite in hardware, and 3D
+  apps render on it.
+- **Made for the phone.** Touch is a tablet, a key row above the keyboard adds
+  Esc, Ctrl, Super, Tab, function keys and arrows, the desktop follows the
+  phone as it turns or folds, and iPhone Duo gets layouts of its own.
+
+## What it runs
+
+Linux comes first. From the Install tab, each with an account of your own:
+
+| Distribution | Desktop |
+|---|---|
+| Ubuntu 26.04 LTS | GNOME, the heaviest of them, and it runs |
+| Debian 13 | KDE Plasma, Xfce, or a minimal Xfce that starts fastest |
+| Arch Linux ARM | KDE Plasma or Xfce |
+| Omarchy | Hyprland |
+
+Support for other operating systems is coming.
+
+crate needs JIT, which iOS gives only to an app a debugger has attached to. So
+it can't come from the App Store: it's installed with a development signature
+and JIT is turned on by StikDebug or crate's own built-in StikJIT (see
+[JIT](#jit)). It's developed on an iPhone Duo with iOS 27.1.
+
+## The app
 
 An iOS app that runs Linux VMs on the crate engine: JIT, installing a VM,
 and booting it to its desktop. A few UI stand-ins remain (search the code for
@@ -65,8 +129,9 @@ the hinge and the fold to `crate.log` for checking on the device.
 
 The images come from
 [arm64-desktop-images](https://github.com/oneamendez/arm64-desktop-images),
-whose GitHub workflow builds and attests them: Debian with KDE Plasma, Ubuntu
-with GNOME, Arch Linux ARM with KDE Plasma. Each release has a `catalog.json`
+whose GitHub workflow builds and attests them: Ubuntu with GNOME, Debian with
+KDE Plasma or Xfce (and a minimal Xfce), Arch Linux ARM with KDE Plasma or
+Xfce, and Omarchy with Hyprland. Each release has a `catalog.json`
 listing every image's kernel, initrd and disk (xz, in parts under 2 GiB) with
 their SHA-256s, its kernel command line, and its cloud-init vendor-data.
 
