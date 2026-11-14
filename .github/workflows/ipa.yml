@@ -47,6 +47,21 @@ jobs:
           Scripts/build-ipa.sh "$RUNNER_TEMP/out/crate-unsigned.ipa"
           cd "$RUNNER_TEMP/out"
           shasum -a 256 crate-unsigned.ipa | tee crate-unsigned.ipa.sha256
+      # What the app and its helper say they are, not what project.yml says:
+      # v0.1.1 shipped calling itself 0.1, as its plists named a version of
+      # their own.
+      - name: Check the IPA is the app's version
+        working-directory: ${{ runner.temp }}/out
+        run: |
+          version=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"$/\1/p' "$GITHUB_WORKSPACE/project.yml" | sort -u)
+          build=$(sed -n 's/^ *CURRENT_PROJECT_VERSION: "\(.*\)"$/\1/p' "$GITHUB_WORKSPACE/project.yml" | sort -u)
+          mkdir check && unzip -q crate-unsigned.ipa -d check
+          for plist in check/Payload/Crate.app/Info.plist check/Payload/Crate.app/PlugIns/*.appex/Info.plist; do
+              got="$(plutil -extract CFBundleShortVersionString raw -o - "$plist") ($(plutil -extract CFBundleVersion raw -o - "$plist"))"
+              [ "$got" = "$version ($build)" ] || {
+                  echo "${plist#check/} says $got, but project.yml says $version ($build)" >&2; exit 1; }
+          done
+          rm -rf check
       # Attestations are free on a public repository only.
       - if: github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@v2
