@@ -14,7 +14,8 @@
 # virglrenderer already builds for Apple systems; libepoxy needs
 # patches/libepoxy-ios-angle.patch to find ANGLE in an app, and virglrenderer's
 # patches (patches/virglrenderer-*.patch) fit it to ANGLE on MoltenVK. iPhones
-# only, like ANGLE. Needs meson, ninja and pkg-config (Homebrew).
+# only, like ANGLE. Needs meson, ninja and pkg-config (Homebrew), and Python's
+# PyYAML, which virglrenderer's build uses.
 #
 # VIRGL_DIAGNOSTIC=1 builds virglrenderer with its debug output, which the
 # VREND_DEBUG environment variable then turns on (tex, gles, bgra, ...): for
@@ -43,6 +44,7 @@ if [ "$(cat "$DEST/virglrenderer.version" 2>/dev/null)" = "$STAMP" ] \
     exit 0
 fi
 [ -f "$HEADERS/EGL/egl.h" ] || { echo "no ANGLE headers: run Scripts/build-angle.sh" >&2; exit 1; }
+python3 -c 'import yaml' 2>/dev/null || { echo "virglrenderer's build needs PyYAML: python3 -m pip install pyyaml" >&2; exit 1; }
 
 fetch() {  # url file sha256
     [ -f "$SRC/$2" ] || curl --fail --location --silent --show-error --output "$SRC/$2" "$1"

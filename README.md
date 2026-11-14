@@ -207,7 +207,7 @@ publish a new release with `./Scripts/release-frameworks.sh TAG`, then pin the
     ./Scripts/build-slirp.sh       # libslirp 4.9.7 and GLib 2.90.1; needs meson
     ./Scripts/build-moltenvk.sh    # MoltenVK 1.4.2; about 15 minutes
     ./Scripts/build-angle.sh       # ANGLE; a 4 GB checkout, ANGLE_SRC reuses one
-    ./Scripts/build-virgl.sh       # libepoxy 1.5.10 and virglrenderer 1.3.0
+    ./Scripts/build-virgl.sh       # libepoxy 1.5.10 and virglrenderer 1.3.0; needs PyYAML
 
 Once this repository is public, the `frameworks` workflow, run by hand, does
 the same on GitHub: it builds them all, publishes the release with an

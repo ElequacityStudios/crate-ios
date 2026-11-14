@@ -32,6 +32,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo xcode-select -s /Applications/Xcode_27.1.app
       - run: brew install meson pkg-config
+      # virglrenderer's build reads YAML with Python.
+      - run: python3 -m pip install --quiet --break-system-packages pyyaml
       - run: Scripts/build-idevice.sh
       - run: Scripts/build-slirp.sh
       - run: Scripts/build-moltenvk.sh
