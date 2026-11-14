@@ -141,19 +141,26 @@ final class JITSession {
             defaults.set(false, forKey: claimingKey)
         }
 
-        let size = sizeMB << 20
         let started = Date.now
         var region = crate_code_region()
-        if crate_code_region_map(size, needsAuthorization, &region) != CRATE_REGION_OK {
+        // Below 64 GiB iOS sometimes leaves no gap of the size chosen; less
+        // than this isn't worth having.
+        let minimumMB = min(sizeMB, CodeRegion.minimumFallback)
+        if crate_code_region_map(sizeMB << 20, minimumMB << 20, needsAuthorization, &region) != CRATE_REGION_OK {
             let errorText = String(cString: strerror(errno))
             AppLog.write("jit: no room for \(sizeMB) MB below 64 GiB: iOS first offered "
                          + "\(String(crate_code_region_first_offer, radix: 16)), largest gap \(crate_code_region_largest_gap >> 20) MiB")
             return failure(needsAuthorization
-                ? "iOS wouldn't map \(sizeMB) MB for code low enough for the debugger to authorize (\(errorText)). Try a smaller code region."
+                ? "iOS wouldn't map \(sizeMB) MB for code low enough for the debugger to authorize (\(errorText)). Close crate and open it again to retry."
                 : "iOS wouldn't map \(sizeMB) MB for code (\(errorText)). Try a smaller code region.")
         }
+        let claimedMB = region.size >> 20
+        if claimedMB < sizeMB {
+            AppLog.write("jit: no room for \(sizeMB) MB below 64 GiB (iOS first offered "
+                         + "\(String(crate_code_region_first_offer, radix: 16))); taking the largest gap, \(claimedMB) MB")
+        }
         // Logged before the step that can kill the process, so a crash there has an address.
-        AppLog.write("jit: claiming \(sizeMB) MB at \(String(UInt(bitPattern: region.executable), radix: 16)) "
+        AppLog.write("jit: claiming \(claimedMB) MB at \(String(UInt(bitPattern: region.executable), radix: 16)) "
                      + "(iOS first offered \(String(crate_code_region_first_offer, radix: 16))), "
                      + "authorized=\(needsAuthorization)")
         let status = crate_code_region_finish(&region, needsAuthorization)
@@ -172,10 +179,10 @@ final class JITSession {
         guard crate_code_region_test(&region) else {
             return failure("Code written into the region didn't run correctly.")
         }
-        AppLog.write("jit: on, \(sizeMB) MB claimed and tested in \(String(format: "%.2f", seconds)) s, "
+        AppLog.write("jit: on, \(claimedMB) MB claimed and tested in \(String(format: "%.2f", seconds)) s, "
                      + "code at \(String(UInt(bitPattern: region.executable), radix: 16)), "
                      + "written at \(String(UInt(bitPattern: region.writable), radix: 16))")
-        return (.on(regionMB: sizeMB), region)
+        return (.on(regionMB: claimedMB), region)
     }
 
     nonisolated private static func failure(_ message: String) -> (State, crate_code_region?) {

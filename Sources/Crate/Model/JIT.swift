@@ -35,4 +35,7 @@ enum SettingsKey {
 enum CodeRegion {
     static let choices = [128, 256, 384, 512, 768, 1024]
     static let standard = 1024
+    /// When the size chosen doesn't fit where the debugger can authorize it,
+    /// crate takes the largest gap that does, down to this.
+    static let minimumFallback = 256
 }

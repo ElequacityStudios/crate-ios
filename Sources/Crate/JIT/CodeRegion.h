@@ -42,7 +42,9 @@ typedef enum {
 
    crate_code_region_map maps `size` bytes (rounded up to whole pages)
    executable. With `below_64_gib` the region ends below 64 GiB, the most a
-   debugger's script can authorize (see CodeRegion.c), or the call fails.
+   debugger's script can authorize (see CodeRegion.c). Where that leaves no gap
+   of `size`, it takes the largest gap there is, in whole MiB, if that is at
+   least `min_size`, and otherwise fails. out->size is what it mapped.
 
    crate_code_region_finish then, when `ask_debugger` is set, stops on
    `brk #0x69` with the address in x0 and the length in x1 for the attached
@@ -51,7 +53,8 @@ typedef enum {
    authorized pages fault when run. Only call it with `ask_debugger` while
    crate_jit_traced() is true. With no debugger to answer it the trap kills
    the process. */
-crate_region_status crate_code_region_map(size_t size, bool below_64_gib, crate_code_region *out);
+crate_region_status crate_code_region_map(size_t size, size_t min_size, bool below_64_gib,
+                                          crate_code_region *out);
 /* Where iOS first put the region in the last crate_code_region_map, before
    any move lower, and the largest free gap below 64 GiB the move found: for
    the log. */

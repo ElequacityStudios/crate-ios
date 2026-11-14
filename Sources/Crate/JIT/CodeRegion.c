@@ -77,7 +77,8 @@ static uint64_t find_gap(uint64_t from, uint64_t to, size_t size) {
     }
 }
 
-static void *map_executable(size_t size, bool below_64_gib) {
+static void *map_executable(size_t *size_io, size_t min_size, bool below_64_gib) {
+    size_t size = *size_io;
     void *first = NULL;
 #if DEBUG
     /* Test hook: start where the crashes that found the 64 GiB limit had it. */
@@ -96,17 +97,33 @@ static void *map_executable(size_t size, bool below_64_gib) {
        address space. */
     uint64_t gap = find_gap(4ULL << 30, AUTHORIZABLE_END, size);
     if (gap == 0) {
-        errno = ENOMEM;
-        return MAP_FAILED;
+        /* How much room there is below the limit depends on where iOS put
+           everything else this launch: settle for the largest gap, when it's
+           big enough to be worth having. The failed walk measured it all. */
+        size_t largest = (size_t)(crate_code_region_largest_gap >> 20 << 20);
+        if (largest == 0 || largest < min_size) {
+            errno = ENOMEM;
+            return MAP_FAILED;
+        }
+        size = largest;
+        gap = find_gap(4ULL << 30, AUTHORIZABLE_END, size);
+        crate_code_region_largest_gap = largest;
+        if (gap == 0) {
+            errno = ENOMEM;
+            return MAP_FAILED;
+        }
     }
-    return mmap((void *)gap, size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
+    void *placed = mmap((void *)gap, size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
+    if (placed != MAP_FAILED) *size_io = size;
+    return placed;
 }
 
 
-crate_region_status crate_code_region_map(size_t size, bool below_64_gib, crate_code_region *out) {
+crate_region_status crate_code_region_map(size_t size, size_t min_size, bool below_64_gib,
+                                          crate_code_region *out) {
     size_t page = (size_t)getpagesize();
     size = (size + page - 1) / page * page;
-    void *exec = map_executable(size, below_64_gib);
+    void *exec = map_executable(&size, min_size, below_64_gib);
     if (exec == MAP_FAILED) return CRATE_REGION_MAP_FAILED;
     out->executable = exec;
     out->writable = NULL;
