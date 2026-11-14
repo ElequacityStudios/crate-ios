@@ -100,25 +100,30 @@ mkdir -p "$prefix/lib/pkgconfig"
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_PATH=""
 
+# Each build step runs quietly and shows its output only when it fails.
+quietly() {
+    "$@" > "$WORK/step.log" 2>&1 || { cat "$WORK/step.log" >&2; return 1; }
+}
+
 echo "==> libepoxy $EPOXY_VERSION"
-meson setup "$WORK/epoxy" "$WORK/libepoxy-$EPOXY_VERSION" --cross-file "$WORK/cross.ini" \
+quietly meson setup "$WORK/epoxy" "$WORK/libepoxy-$EPOXY_VERSION" --cross-file "$WORK/cross.ini" \
     --prefix "$prefix" --buildtype release --default-library shared \
-    -Degl=yes -Dglx=no -Dx11=false -Dtests=false -Ddocs=false >/dev/null
-meson compile -C "$WORK/epoxy" >/dev/null
-meson install -C "$WORK/epoxy" >/dev/null
+    -Degl=yes -Dglx=no -Dx11=false -Dtests=false -Ddocs=false
+quietly meson compile -C "$WORK/epoxy"
+quietly meson install -C "$WORK/epoxy"
 
 echo "==> virglrenderer $VIRGL_VERSION"
 # check-gl-errors off: with it on, one GL call ANGLE refuses (Chrome's first
 # CREATE_OBJECT gets GL_INVALID_ENUM) marks the guest's whole context broken
 # and every later submit fails. Off, the error is logged and only that call is
 # lost.
-meson setup "$WORK/virgl" "$WORK/virglrenderer-$VIRGL_VERSION" --cross-file "$WORK/cross.ini" \
+quietly meson setup "$WORK/virgl" "$WORK/virglrenderer-$VIRGL_VERSION" --cross-file "$WORK/cross.ini" \
     --prefix "$prefix" --buildtype release --default-library shared \
     -Dplatforms=egl -Dvenus=false -Dvideo=false -Dtests=false -Dfuzzer=false \
     -Dminigbm_allocation=false -Dtracing=none -Dcheck-gl-errors=false \
-    ${DIAGNOSTIC:+-Db_ndebug=false} >/dev/null
-meson compile -C "$WORK/virgl" >/dev/null
-meson install -C "$WORK/virgl" >/dev/null
+    ${DIAGNOSTIC:+-Db_ndebug=false}
+quietly meson compile -C "$WORK/virgl"
+quietly meson install -C "$WORK/virgl"
 
 # A dylib as a framework: the binary under the framework's name, an @rpath
 # install name, and an Info.plist.
