@@ -139,7 +139,7 @@ codesign --verify --deep --strict "$APP"
 OUT="${IPA%-unsigned.ipa}"
 OUT="${OUT%.ipa}-signed.ipa"
 rm -f "$OUT"
-(cd "$WORK/ipa" && ditto -c -k --keepParent Payload "$OUT")
+(cd "$WORK/ipa" && ditto -c -k --norsrc --noextattr --noacl --keepParent Payload "$OUT")
 echo "signed: $OUT"
 
 if [ -n "$DEVICE" ]; then

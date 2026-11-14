@@ -7,8 +7,8 @@ import Observation
 
 /// The installed VMs.
 ///
-/// Persisted to UserDefaults as JSON so fake installs survive a relaunch. When
-/// installs are real this becomes a listing of the VMs' directories on disk.
+/// Persisted to UserDefaults as JSON; each VM's files are in its own folder
+/// (GuestFiles).
 @Observable
 final class MachineStore {
     private(set) var machines: [Machine] {
@@ -24,11 +24,14 @@ final class MachineStore {
         defaults.removeObject(forKey: "defaultMachineID")
         if let data = defaults.data(forKey: Self.machinesKey),
            let saved = try? JSONDecoder().decode([Machine].self, from: data) {
-            machines = saved
+            // v0.1 started with the sample VMs, which have no image and no files.
+            machines = saved.filter { $0.imageID != nil || GuestFiles(for: $0).exists }
+            for machine in saved where !machines.contains(machine) {
+                AppLog.write("store: removed \(machine.name), which has no files")
+            }
+            if machines.count != saved.count { save() }
         } else {
-            // First launch: the sample VMs.
-            machines = Machine.samples
-            save()
+            machines = []
         }
     }
 

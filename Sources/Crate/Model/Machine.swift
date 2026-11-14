@@ -46,7 +46,8 @@ struct Machine: Identifiable, Codable, Hashable {
 
 // MARK: - Sample data
 
-// SAMPLE DATA: stands in for VMs on disk until installs are real.
+// For previewing the UI (`--samples`): they have no files, and the next
+// launch without `--samples` takes them out of the list again.
 extension Machine {
     static let sampleDebian = Machine(
         distributionID: "debian", version: "13.2", codename: "Trixie",

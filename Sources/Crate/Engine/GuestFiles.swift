@@ -25,6 +25,8 @@ struct GuestFiles {
     /// Its screen as it was when last stopped, for its card on Home.
     var preview: URL { directory.appendingPathComponent("preview.jpg") }
 
+    var exists: Bool { FileManager.default.fileExists(atPath: directory.path) }
+
     /// The files a boot needs that aren't there, by name.
     var missing: [String] {
         [kernel, initrd, disk]
