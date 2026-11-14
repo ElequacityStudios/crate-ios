@@ -42,7 +42,9 @@ SHA256="$(shasum -a 256 "$WORK/Frameworks.zip" | cut -d' ' -f1)"
 } > "$WORK/notes.md"
 
 export GH_TOKEN="${GH_TOKEN:-$(gh auth token -u oneamendez)}"
-gh release create "$TAG" -R oneamendez/crate-ios --title "Frameworks $TAG" --notes-file "$WORK/notes.md" \
+# Never the repository's latest release: INSTALL.md's link to the latest
+# release's IPA has to keep finding the app's.
+gh release create "$TAG" -R oneamendez/crate-ios --title "Frameworks $TAG" --notes-file "$WORK/notes.md" --latest=false \
     "$WORK/Frameworks.zip"
 echo "Pin it in Scripts/fetch-frameworks.sh:"
 echo "VERSION=$TAG"
