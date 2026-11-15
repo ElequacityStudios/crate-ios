@@ -94,8 +94,8 @@ targets:
       - framework: Frameworks/GLib.xcframework
         embed: true
       - package: SwiftTerm
-    # The VM's 3D: virglrenderer, libepoxy, ANGLE and MoltenVK, built by
-    # Scripts/build-moltenvk.sh, build-angle.sh and build-virgl.sh. They're for
+    # The VM's 3D: virglrenderer, libepoxy, ANGLE and MoltenVK. The separate Venus
+    # renderer is built by Scripts/build-virgl-venus.sh. They're for
     # iPhones only and crate opens them itself, so they're copied in, not linked;
     # without them the VM still runs, in 2D.
     postBuildScripts:
@@ -104,7 +104,7 @@ targets:
         script: |
           [ "$PLATFORM_NAME" = iphoneos ] || exit 0
           SRC="$PROJECT_DIR/Frameworks/GPU"
-          NAMES="MoltenVK EGL GLESv2 epoxy virglrenderer.1"
+          NAMES="MoltenVK EGL GLESv2 epoxy virglrenderer.1 virglrenderer.venus"
           for name in $NAMES; do
             [ -d "$SRC/$name.framework" ] || {
               echo "warning: no $name.framework, so VMs get a 2D display: run Scripts/build-moltenvk.sh, build-angle.sh and build-virgl.sh"

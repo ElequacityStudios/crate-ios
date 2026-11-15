@@ -3,10 +3,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-# Build MoltenVK (Apache-2.0), Khronos's Vulkan on Metal, from its release's
-# source, as Frameworks/GPU/MoltenVK.framework: what ANGLE renders the VM's 3D
-# on. See Scripts/build-angle.sh for why ANGLE runs on Vulkan rather than on
-# Metal directly.
+# Build MoltenVK at the upstream host-pointer-import fix needed by Venus, as
+# Frameworks/GPU/MoltenVK.framework. ANGLE continues to use it for OpenGL ES.
 #
 #     ./Scripts/build-moltenvk.sh
 #
@@ -16,13 +14,13 @@
 # revisions this release names; a clean build is about 15 minutes.
 set -euo pipefail
 
-VERSION=1.4.2
-COMMIT=db66022459ffb663aa2b50f6b018bc2e124f5edf   # tag v1.4.2
+VERSION=05604465
+COMMIT=05604465d691118cfd20f53a48ecf1aad9c12f93   # VK_EXT_external_memory_host import fix
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$REPO/.deps/src/MoltenVK-$VERSION"
 DEST="$REPO/Frameworks/GPU"
-STAMP="MoltenVK $VERSION"
+STAMP="MoltenVK $VERSION (host-pointer import)"
 
 if [ "$(cat "$DEST/MoltenVK.version" 2>/dev/null)" = "$STAMP" ] && [ -d "$DEST/MoltenVK.framework" ]; then
     echo "$STAMP already in Frameworks/GPU/"
@@ -31,9 +29,13 @@ fi
 
 if [ ! -d "$SRC/.git" ]; then
     mkdir -p "$(dirname "$SRC")"
-    git clone --quiet --depth 1 --branch "v$VERSION" https://github.com/KhronosGroup/MoltenVK.git "$SRC"
+    git init -q "$SRC"
+    git -C "$SRC" remote add origin https://github.com/KhronosGroup/MoltenVK.git
 fi
-[ "$(git -C "$SRC" rev-parse HEAD)" = "$COMMIT" ] || { echo "MoltenVK v$VERSION isn't $COMMIT" >&2; exit 1; }
+git -C "$SRC" fetch -q --depth=1 origin "$COMMIT"
+git -C "$SRC" checkout -q -f --detach "$COMMIT"
+git -C "$SRC" clean -q -fdx
+[ "$(git -C "$SRC" rev-parse HEAD)" = "$COMMIT" ] || { echo "MoltenVK isn't $COMMIT" >&2; exit 1; }
 
 cd "$SRC"
 echo "==> MoltenVK's dependencies"
