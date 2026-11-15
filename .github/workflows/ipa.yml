@@ -45,6 +45,9 @@ jobs:
           ref: main
           path: crate
       - uses: dtolnay/rust-toolchain@stable
+      - name: Test virtio input device
+        run: cargo test -p crate-devices
+        working-directory: crate
       - name: Frameworks
         env:
           # For gh, checking each pinned release's attestation.
