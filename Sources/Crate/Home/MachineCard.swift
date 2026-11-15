@@ -15,8 +15,6 @@ struct MachineCard: View {
     let onDelete: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
-    /// The only setting so far is iPhone Duo's.
-    @Environment(\.hasHinge) private var hasHinge
 
     var body: some View {
         Group {
@@ -143,7 +141,6 @@ struct MachineCard: View {
     private var moreMenu: some View {
         Menu {
             Button("Edit Settings…", systemImage: "slider.horizontal.3", action: onEditSettings)
-                .disabled(!hasHinge)
             Divider()
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         } label: {

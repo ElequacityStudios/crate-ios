@@ -22,7 +22,8 @@ struct InstallScreen: View {
     @State private var askingForAccount = false
     @State private var confirmingCancel = false
 
-    private let memoryChoices = [4, 6, 8]
+    /// The memory limits a VM can have, here and in its settings.
+    static let memoryChoices = [4, 6, 8]
 
     /// The disk sizes the slider stops at, for the selected image.
     private var diskStops: [Int] {
@@ -71,7 +72,7 @@ struct InstallScreen: View {
 
                 Section {
                     Picker("Memory limit", selection: $memoryGB) {
-                        ForEach(memoryChoices, id: \.self) { gb in
+                        ForEach(Self.memoryChoices, id: \.self) { gb in
                             Text("\(gb) GB").tag(gb)
                         }
                     }
@@ -183,9 +184,9 @@ struct InstallScreen: View {
     }
 
     private var memoryFooter: String {
-        var text = "The most memory the VM may use. You can change it later."
+        var text = "The most memory the VM may use. You can change it later in the VM's settings."
         if let limit = MemoryReport().limit, UInt64(memoryGB) << 30 > limit {
-            text += " crate can only claim \(Format.memory(limit)) on this iPhone, so the VM gets less."
+            text += " crate can only claim \(Format.memory(limit)) on this \(UIDevice.current.localizedModel), so the VM gets less."
         }
         return text
     }
