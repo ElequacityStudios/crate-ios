@@ -510,9 +510,12 @@ struct DisplayView: UIViewRepresentable {
         /// A mouse's other buttons pressed aren't the left one held down, or a
         /// long press: they click as themselves, and nothing else sees them.
         func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive event: UIEvent) -> Bool {
-            // In capture mode GameController supplies the mouse's raw movement
-            // and buttons; don't also treat its UIKit pointer events as touches.
-            if mouseCaptured && !event.buttonMask.isEmpty { return false }
+            // Capture is exclusive inside this view: raw GameController mouse
+            // input is the only pointer path into the guest. In particular,
+            // don't let UIKit hover/button gestures turn into guest clicks,
+            // and don't let a finger accidentally drive the tablet meanwhile.
+            // The release button is a subview and continues to receive taps.
+            if mouseCaptured { return false }
             return !primaryOnly.contains(recognizer) || event.buttonMask.isSubset(of: .primary)
         }
 
@@ -565,7 +568,7 @@ struct DisplayView: UIViewRepresentable {
             input.mouseMovedHandler = { [weak self] _, dx, dy in
                 DispatchQueue.main.async {
                     guard let self, self.mouseCaptured else { return }
-                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: Int32(dy.rounded()),
+                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: -Int32(dy.rounded()),
                                       buttons: self.mouseButtons)
                 }
             }
