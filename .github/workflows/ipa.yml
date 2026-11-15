@@ -46,7 +46,7 @@ jobs:
           path: crate
       - uses: dtolnay/rust-toolchain@stable
       - name: Test virtio devices, host-visible memory and VM construction
-        run: cargo test -p crate-devices -p crate-host -p crate-virt
+        run: cargo test --all-targets -p crate-devices -p crate-host -p crate-virt
         working-directory: crate
       - name: Frameworks
         env:
