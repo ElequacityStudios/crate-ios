@@ -23,6 +23,7 @@ import UIKit
 struct DisplayView: UIViewRepresentable {
     let bridge: DisplayBridge
     @Binding var showsKeyboard: Bool
+    @Binding var mouseCaptured: Bool
     /// Set once the first frame is on screen.
     @Binding var hasPicture: Bool
     /// Where in the view the picture goes, when not all of it is open: above
@@ -32,6 +33,7 @@ struct DisplayView: UIViewRepresentable {
     func makeUIView(context: Context) -> ScreenView {
         let view = ScreenView(bridge: bridge)
         view.onKeyboardHidden = { showsKeyboard = false }
+        view.onMouseCaptureChanged = { mouseCaptured = $0 }
         let hasPicture = $hasPicture
         // No screen is the VM stopping, which MachineScreen shows in place
         // of this view.
@@ -56,12 +58,14 @@ struct DisplayView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: ScreenView, coordinator: ()) {
+        view.releaseMouseCapture()
         view.bridge.disconnect(.app)
     }
 
     final class ScreenView: UIView, UIKeyInput, UIGestureRecognizerDelegate, UIPointerInteractionDelegate {
         let bridge: DisplayBridge
         var onKeyboardHidden: (() -> Void)?
+        var onMouseCaptureChanged: ((Bool) -> Void)?
         private var imageSize = CGSize.zero
         private var scrollCarry = CGPoint.zero
         /// The buttons the guest last heard were down, which the pointer
@@ -587,9 +591,14 @@ struct DisplayView: UIViewRepresentable {
             setMouseCapture(!mouseCaptured)
         }
 
+        func releaseMouseCapture() {
+            if mouseCaptured { setMouseCapture(false) }
+        }
+
         private func setMouseCapture(_ captured: Bool) {
             guard mouseDevice != nil else { return }
             mouseCaptured = captured
+            onMouseCaptureChanged?(captured)
             pointerInteraction.invalidate()
             if captured, let input = mouseDevice?.mouseInput {
                 mouseButtons = (input.leftButton.isPressed ? 1 : 0)

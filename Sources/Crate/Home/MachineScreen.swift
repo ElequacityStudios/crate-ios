@@ -19,6 +19,7 @@ struct MachineScreen: View {
     @State private var confirmingStop = false
     @State private var showing = Showing.display
     @State private var showsKeyboard = false
+    @State private var mouseCaptured = false
     @State private var hasPicture = false
     /// How many times the hinge has opened or closed further.
     @State private var folds = 0
@@ -57,12 +58,15 @@ struct MachineScreen: View {
                 // being typed stays in sight.
                 .ignoresSafeArea(.keyboard, edges: showing == .display ? .all : [])
                 .overlay(alignment: .bottomLeading) {
-                    if let screenshot { thumbnail(screenshot) }
+                    if let screenshot, !mouseCaptured { thumbnail(screenshot) }
                 }
                 .background(Color.black.ignoresSafeArea())
                 .modifier(MachineTitle(title: "\(machine.name) \(machine.version)"))
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar { toolbar }
+                .toolbar {
+                    if !mouseCaptured { toolbar }
+                }
+                .toolbar(mouseCaptured ? .hidden : .visible, for: .navigationBar)
                 .confirmationDialog("Stop \(machine.name)?", isPresented: $confirmingStop,
                                     titleVisibility: .visible) {
                     Button("Stop VM", role: .destructive) { stop() }
@@ -234,7 +238,7 @@ struct MachineScreen: View {
         GeometryReader { proxy in
             let open = Self.aboveFold(in: proxy, after: folds)
             DisplayView(bridge: runner.display, showsKeyboard: $showsKeyboard,
-                        hasPicture: $hasPicture, openRegion: open)
+                        mouseCaptured: $mouseCaptured, hasPicture: $hasPicture, openRegion: open)
                 .onChange(of: open) { _, open in Self.log(open, in: proxy.size) }
         }
         // The keyboard covers the desktop rather than resizing it, which the
