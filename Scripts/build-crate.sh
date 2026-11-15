@@ -33,7 +33,9 @@ if ! grep -q 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs"
     || ! grep -q 'F_CONTEXT_INIT: u64 = 1 << 4' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
     || ! grep -q 'virgl_renderer_context_create_with_flags' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
     || ! grep -q 'virgl_renderer_context_create_fence' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'write_context_fence: Some(write_context_fence)' "$CRATE_DIR/crates/crate-host/src/virgl.rs"; then
+    || ! grep -q 'write_context_fence: Some(write_context_fence)' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -q 'context_fenced: VecDeque<FencedContext>' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -q 'venus_context_init_and_timeline_fences_are_forwarded' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs"; then
     echo "crate checkout lacks complete virtio-gpu Venus context initialization and timeline fences" >&2
     exit 1
 fi
