@@ -9,7 +9,13 @@
 name: ipa
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    paths:
+      - 'Sources/**'
+      - 'Scripts/**'
+      - '.github/workflows/ipa.yml'
+      - 'project.yml'
   workflow_dispatch:
 
 permissions:
