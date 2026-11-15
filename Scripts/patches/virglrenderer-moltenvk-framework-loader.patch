@@ -1,11 +1,6 @@
 diff --git a/src/venus/vkr_library.c b/src/venus/vkr_library.c
 --- a/src/venus/vkr_library.c
 +++ b/src/venus/vkr_library.c
-@@ -48,6 +48,6 @@ vkr_library_driver_path(void)
- static const char *
- vkr_library_driver_path(void)
- {
-    const char *path = getenv("VKR_VULKAN_DRIVER");
+@@ -1 +1 @@
 -   return path && *path ? path : "@rpath/libMoltenVK.dylib";
 +   return path && *path ? path : "@rpath/MoltenVK.framework/MoltenVK";
- }
