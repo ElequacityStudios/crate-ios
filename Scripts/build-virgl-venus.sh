@@ -7,11 +7,11 @@
 # virglrenderer.1.framework remains the OpenGL fallback; crate will load this
 # framework only for its Vulkan/Venus backend.
 #
-# The renderer is UTM's macOS/Metal Venus port, kept at the protocol snapshot
-# used by the app's Mesa 26.2.x guest. Do not merge the newer Mesa 26.3
-# protocol update: Venus's generated wire schema must match the guest exactly,
-# or guest vkCreateInstance can fail with the misleading OUT_OF_HOST_MEMORY.
-# The pinned steamac fixes are Apache-2.0 and remain attributed to fxgl/steamac.
+# The renderer is UTM's macOS/Metal Venus port, merged with the upstream
+# virglrenderer revision against which the pinned steamac patches were authored.
+# The steamac fixes are Apache-2.0 and remain attributed to fxgl/steamac.
+# Keep the UTM Metal backend while applying the upstream Venus protocol/renderer
+# changes required by those patches.
 # Vulkan is loaded at runtime, never linked.
 set -euo pipefail
 
@@ -19,6 +19,7 @@ EPOXY_VERSION=1.5.10
 EPOXY_SHA256=a7ced37f4102b745ac86d6a70a9da399cc139ff168ba6b8002b4d8d43c900c15
 ANGLE_REV=9addc2983b90152f628cfdaea194983b46b254bd
 UTM_COMMIT=5d26f605f50f8e22002ec6db5fb775e1992d4e96
+UPSTREAM_COMMIT=aafa9bd234a43c31004ec768ce000b21cf7b99ca
 STEAMAC_COMMIT=32a66354a24cc62d4c9ec1d263c5df7a0b1e1d7e
 MIN_IOS=18.0
 
@@ -28,7 +29,7 @@ SRC="$DEPS/src"
 WORK="$DEPS/virgl-venus-build"
 DEST="$REPO/Frameworks/GPU"
 HEADERS="$DEPS/angle-include"
-STAMP="UTM virglrenderer $UTM_COMMIT; Mesa 26.2 Venus protocol; steamac $STEAMAC_COMMIT; Venus capset 4; MoltenVK framework loader; libepoxy $EPOXY_VERSION; iOS $MIN_IOS"
+STAMP="UTM virglrenderer $UTM_COMMIT + upstream $UPSTREAM_COMMIT + steamac $STEAMAC_COMMIT; Venus capset 4; MoltenVK framework loader; libepoxy $EPOXY_VERSION; iOS $MIN_IOS"
 
 if [ "$(cat "$DEST/virglrenderer.venus.version" 2>/dev/null)" = "$STAMP" ] \
     && [ -d "$DEST/virglrenderer.venus.framework" ] && [ -d "$DEST/epoxy.framework" ]; then
@@ -72,29 +73,30 @@ git -C "$STEAMAC_DIR" remote add origin https://github.com/fxgl/steamac.git
 git -C "$STEAMAC_DIR" fetch -q --depth=1 origin "$STEAMAC_COMMIT"
 git -C "$STEAMAC_DIR" checkout -q --detach FETCH_HEAD
 
-# UTM's fork carries the macOS/Metal Venus port and the generated protocol
-# schema matching the app's Mesa 26.2.x guest. Keep this snapshot intact:
-# the upstream Mesa 26.3 protocol update changes the generated wire schema.
+# UTM's fork carries the macOS/Metal Venus port. The pinned steamac patch
+# series was authored against this exact upstream merge, not the unmerged UTM
+# snapshot; keep the merge so every patch applies to its intended source ABI.
 git init -q "$WORK/virglrenderer"
 git -C "$WORK/virglrenderer" remote add origin https://github.com/utmapp/virglrenderer.git
 git -C "$WORK/virglrenderer" fetch -q --depth=1 origin "$UTM_COMMIT"
-git -C "$WORK/virglrenderer" checkout -q -f --detach FETCH_HEAD
+git -C "$WORK/virglrenderer" remote add upstream https://gitlab.freedesktop.org/virgl/virglrenderer.git
+git -C "$WORK/virglrenderer" fetch -q --depth=1 upstream "$UPSTREAM_COMMIT"
+git -C "$WORK/virglrenderer" checkout -q -f --detach "$UTM_COMMIT"
 git -C "$WORK/virglrenderer" clean -q -fdx
-
-# Fail closed if the pinned source's generated protocol drifts away from the
-# Mesa 26.2.x guest ABI. This header advertises both the Vulkan XML revision
-# and VK_MESA_venus_protocol spec version to the guest during initialization.
-PROTOCOL_INFO="$WORK/virglrenderer/src/venus/venus-protocol/vn_protocol_renderer_info.h"
-grep -Fq 'return VK_MAKE_API_VERSION(0, 1, 4, 343);' "$PROTOCOL_INFO" || {
-    echo "UTM Venus protocol no longer matches the Mesa 26.2.x Vulkan XML revision" >&2
-    exit 1
-}
-grep -Fq '{ "VK_MESA_venus_protocol", 385, 4 }' "$PROTOCOL_INFO" || {
-    echo "UTM Venus protocol no longer matches the Mesa 26.2.x extension revision" >&2
-    exit 1
-}
+export GIT_AUTHOR_NAME=crate-builder GIT_AUTHOR_EMAIL=crate-builder@local
+export GIT_COMMITTER_NAME=crate-builder GIT_COMMITTER_EMAIL=crate-builder@local
+export GIT_AUTHOR_DATE=2026-10-03T00:00:00Z GIT_COMMITTER_DATE=2026-10-03T00:00:00Z
+if ! git -C "$WORK/virglrenderer" merge -q --no-ff --no-edit "$UPSTREAM_COMMIT" > "$WORK/merge.log" 2>&1; then
+    if [ -n "$(git -C "$WORK/virglrenderer" diff --name-only --diff-filter=U)" ]; then
+        (cd "$WORK/virglrenderer" && python3 "$STEAMAC_DIR/host/virglrenderer/merge-resolve.py")
+        git -C "$WORK/virglrenderer" commit -q --no-edit
+    else
+        cat "$WORK/merge.log" >&2
+        exit 1
+    fi
+fi
 if git -C "$WORK/virglrenderer" grep -qE '^(<<<<<<<|>>>>>>>) ' -- '*.c' '*.h' '*.build'; then
-    echo "unresolved virglrenderer conflict markers" >&2
+    echo "unresolved virglrenderer merge conflict markers" >&2
     exit 1
 fi
 for patch in "$STEAMAC_DIR"/host/virglrenderer/patches/*.patch; do
