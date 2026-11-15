@@ -16,13 +16,24 @@ struct InstallScreen: View {
     @State private var catalog = CatalogState.loading
     @State private var selectedID: String?
     @AppStorage(SettingsKey.installMemoryGB) private var memoryGB = 6
+    /// The size last picked, which may not be one this image or device offers:
+    /// `diskGB` is the one that's used.
+    @AppStorage(SettingsKey.installDiskGB) private var pickedDiskGB = DiskSize.standard
     @State private var askingForAccount = false
     @State private var confirmingCancel = false
 
     private let memoryChoices = [4, 6, 8]
-    /// The disk every VM gets: a sparse file, so it takes only what the guest
-    /// writes.
-    private let diskGB = 32
+
+    /// The disk sizes the slider stops at, for the selected image.
+    private var diskStops: [Int] {
+        DiskSize.stops(for: selected, deviceBytes: Format.totalDiskBytes())
+    }
+
+    /// The VM's disk: the size picked, or the nearest this image and device
+    /// allow. A sparse file, so it takes only what the guest writes.
+    private var diskGB: Int {
+        DiskSize.nearest(to: pickedDiskGB, in: diskStops)
+    }
 
     enum CatalogState {
         case loading
@@ -71,6 +82,15 @@ struct InstallScreen: View {
                     Text("Memory Limit")
                 } footer: {
                     Text(memoryFooter)
+                }
+                .disabled(installer.isBusy)
+
+                Section {
+                    diskSlider
+                } header: {
+                    Text("Disk Size")
+                } footer: {
+                    Text(diskFooter)
                 }
                 .disabled(installer.isBusy)
 
@@ -166,6 +186,49 @@ struct InstallScreen: View {
         var text = "The most memory the VM may use. You can change it later."
         if let limit = MemoryReport().limit, UInt64(memoryGB) << 30 > limit {
             text += " crate can only claim \(Format.memory(limit)) on this iPhone, so the VM gets less."
+        }
+        return text
+    }
+
+    // MARK: - Disk size
+
+    /// The size, then a slider over the stops.
+    @ViewBuilder
+    private var diskSlider: some View {
+        let stops = diskStops
+        LabeledContent("Disk", value: "\(diskGB) GB")
+            .monospacedDigit()
+        if stops.count > 1 {
+            Slider(value: diskStopIndex(in: stops), in: 0...Double(stops.count - 1), step: 1) {
+                Text("Disk Size")
+            } minimumValueLabel: {
+                Text("\(stops[0]) GB")
+            } maximumValueLabel: {
+                Text("\(stops[stops.count - 1]) GB")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .accessibilityValue("\(diskGB) GB")
+        }
+    }
+
+    private func diskStopIndex(in stops: [Int]) -> Binding<Double> {
+        Binding(
+            get: { Double(stops.firstIndex(of: diskGB) ?? 0) },
+            set: { pickedDiskGB = stops[min(stops.count - 1, max(0, Int($0.rounded())))] })
+    }
+
+    /// The free space isn't given as a number here: the disk's size is binary
+    /// GB, as memory's is, and the Install bar's free space decimal, as the
+    /// Settings app's is, so a number here would disagree with one or the other.
+    private var diskFooter: String {
+        let device = UIDevice.current.localizedModel
+        var text = "The most the VM can store. It's set now and can't be changed once the VM is installed. "
+            + "It takes up space on this \(device) as the VM writes, plus up to about "
+            + "\(Format.memory(DiskSize.setAside(diskGB))) that Linux sets aside as it starts using a disk this size."
+        if let free = freeBytes, Int64(diskGB) << 30 > free {
+            text += " That's more than this \(device) has free: "
+                + "if the \(device) fills up first, the VM can't save anything more."
         }
         return text
     }
@@ -280,6 +343,41 @@ struct InstallScreen: View {
             return "Free up \(Format.bytes(needed - free)) to install \(image.name)."
         }
         return "Downloads \(Format.bytes(image.downloadBytes)) · needs \(Format.bytes(needed)) · \(Format.bytes(free)) available"
+    }
+}
+
+/// The disk sizes a new VM can have, in GB (binary, as the memory limit's are).
+enum DiskSize {
+    /// Finer where a few GB matter, coarser where they don't.
+    static let allStops = [16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024]
+    static let standard = 32
+    /// Room for the guest to write beyond the image's own filesystem, at least.
+    static let headroomGB = 8
+
+    /// The stops for `image`: from its filesystem plus some room, up to the
+    /// device's whole capacity. The disk is sparse, so more than is free now
+    /// is allowed, but not more than the device could ever hold.
+    static func stops(for image: CatalogImage?, deviceBytes: Int64?) -> [Int] {
+        let gib = Int64(1) << 30
+        let imageGB = image.map { Int(($0.disk.size + gib - 1) / gib) } ?? 0
+        let smallest = allStops.first { $0 >= imageGB + headroomGB } ?? allStops[allStops.count - 1]
+        let largest = deviceBytes.map { Int($0 / gib) } ?? Int.max
+        let stops = allStops.filter { $0 >= smallest && $0 <= largest }
+        return stops.isEmpty ? [smallest] : stops
+    }
+
+    /// What Linux writes across a new ext4 disk of `gb` once it's grown to
+    /// it: zeroed inode tables, 256 bytes for every 16 KiB, a 64th of the
+    /// disk. crate's disk can't be told to leave zeros unwritten, so they take
+    /// real space on the device. btrfs (Omarchy) writes none of it.
+    static func setAside(_ gb: Int) -> UInt64 {
+        (UInt64(gb) << 30) / 64
+    }
+
+    /// The stop nearest `picked`: a size picked for one image may not be
+    /// offered for another.
+    static func nearest(to picked: Int, in stops: [Int]) -> Int {
+        stops.min { abs($0 - picked) < abs($1 - picked) } ?? standard
     }
 }
 

@@ -28,6 +28,7 @@ enum SettingsKey {
     static let jitAtLaunch = "jit.turnOnAtLaunch"
     static let codeRegionMB = "jit.codeRegionMB"
     static let installMemoryGB = "install.memoryGB"
+    static let installDiskGB = "install.diskGB"
 
     /// Debug builds: pretend JIT is on (see `JITSession.previewOn`).
     static let previewJIT = "preview.jitOn"

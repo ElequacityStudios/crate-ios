@@ -36,4 +36,11 @@ enum Format {
         let values = try? home.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         return values?.volumeAvailableCapacityForImportantUsage
     }
+
+    /// The size of the volume that holds the app's data, free or not.
+    static func totalDiskBytes() -> Int64? {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        let values = try? home.resourceValues(forKeys: [.volumeTotalCapacityKey])
+        return values?.volumeTotalCapacity.map(Int64.init)
+    }
 }
