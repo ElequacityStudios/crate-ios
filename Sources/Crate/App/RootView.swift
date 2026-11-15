@@ -31,6 +31,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 /// The three tabs, and the running VM over them.
 struct RootView: View {
     @Environment(JITSession.self) private var jit
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.jitAtLaunch) private var jitAtLaunch = true
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
 
@@ -75,6 +76,8 @@ struct RootView: View {
         }
         .task { openLaunchTab() }
         .onChange(of: jit.state, initial: true) { launchSettled() }
+        // Back from LocalDevVPN, if turning JIT on was waiting for it.
+        .onChange(of: scenePhase) { if scenePhase == .active { jit.cameToFront() } }
     }
 
     private var tabs: some View {

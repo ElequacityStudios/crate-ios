@@ -30,6 +30,9 @@ final class JITSetup {
     private(set) var pairing = Pairing.idle
     /// Nil while checking.
     private(set) var tunnel: LocalDevVPN.Tunnel?
+    /// The port the Remote Pairing service answered on, for the helper, when
+    /// it isn't the usual one (LocalDevVPN.Check.portForHelper).
+    private var port: UInt16?
     private(set) var preparation = Preparation.idle
     var importError: String?
 
@@ -164,9 +167,13 @@ final class JITSetup {
 
     // MARK: - LocalDevVPN
 
+    /// A few seconds' grace: back from LocalDevVPN, its tunnel may not be
+    /// routing yet.
     func checkTunnel() async {
         tunnel = nil
-        tunnel = await LocalDevVPN.probe()
+        let check = await LocalDevVPN.check(waitingUpTo: .seconds(3))
+        tunnel = check.tunnel
+        port = check.portForHelper
     }
 
     func connectVPN() {
@@ -179,16 +186,18 @@ final class JITSetup {
     /// the first time. Turning JIT on does this too; doing it here shows any
     /// problem before then.
     func prepare() {
-        guard let pairing = PairingFile.read() else { return }
+        guard preparation != .working, let pairing = PairingFile.read() else { return }
         preparation = .working
-        crate_helper_request(["op": "prepare", "pairing": pairing]) { reply, failure in
+        var request: [String: Any] = ["op": "prepare", "pairing": pairing]
+        if let port { request["port"] = Int(port) }
+        crate_helper_request(request) { reply, failure in
             let ok = reply?["ok"] as? Bool ?? false
             let summary = reply?["summary"] as? String ?? failure ?? "no reply"
             let lines = reply?["log"] as? [String] ?? []
             Task { @MainActor in
                 for line in lines { AppLog.write("helper: \(line)") }
                 AppLog.write("jit: prepare: \(ok ? "" : "FAILED: ")\(summary)")
-                self.preparation = ok ? .ready(summary) : .failed(summary)
+                self.preparation = ok ? .ready(summary) : .failed(summary + JITSession.hint(for: summary))
             }
         }
     }

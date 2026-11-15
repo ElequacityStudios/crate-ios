@@ -17,7 +17,9 @@ import StikJIT
 /// each the item's userInfo:
 ///
 ///   in:  "op": "enable" (the default) or "prepare"; "pairing", the pairing
-///        file's bytes; for enable, "pid", the process to attach to
+///        file's bytes; "port", the Remote Pairing service's port, when crate
+///        has found it (otherwise StikJIT looks for it itself); for enable,
+///        "pid", the process to attach to
 ///   out: "ok", "summary", and "log", this helper's lines (there's no channel to
 ///        stream them back on)
 ///
@@ -67,6 +69,7 @@ final class CrateJITHelper: NSObject, NSExtensionRequestHandling {
                 targetPID: Int32(pid),
                 pairingFile: pairingURL,
                 ddiPaths: ddiPaths,
+                configuration: configuration(request, log: log),
                 script: .legacy,
                 preparationProgress: { stage in log("prepare: \(stage)") },
                 progress: { line in log(line) })
@@ -80,7 +83,8 @@ final class CrateJITHelper: NSObject, NSExtensionRequestHandling {
     private static func prepare(_ request: [AnyHashable: Any], log: @escaping (String) -> Void) throws -> String {
         #if canImport(StikJIT)
         return try withPairingFile(request) { pairingURL in
-            let readiness = StikJIT.prepareDevice(pairingFile: pairingURL, paths: ddiPaths) { stage in
+            let readiness = StikJIT.prepareDevice(pairingFile: pairingURL, paths: ddiPaths,
+                                                  configuration: configuration(request, log: log)) { stage in
                 log("prepare: \(stage)")
             }
             switch readiness {
@@ -101,6 +105,17 @@ final class CrateJITHelper: NSObject, NSExtensionRequestHandling {
     }
 
     #if canImport(StikJIT)
+    /// LocalDevVPN's address with the port crate found, which crate, in front
+    /// with Local Network access, can look up where this extension may not.
+    /// Without one, StikJIT's own: it looks, and falls back to 49152.
+    private static func configuration(_ request: [AnyHashable: Any], log: (String) -> Void) -> StikJIT.Configuration {
+        guard let port = request["port"] as? Int, let rsdPort = UInt16(exactly: port), rsdPort > 0 else {
+            return .default
+        }
+        log("Remote Pairing port \(rsdPort), from crate")
+        return StikJIT.Configuration(rsdPort: rsdPort, automaticallyDiscoverRSDPort: false)
+    }
+
     /// The developer disk image, downloaded once and kept here between requests.
     private static var ddiPaths: DDIPaths {
         let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]

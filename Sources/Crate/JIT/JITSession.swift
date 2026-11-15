@@ -68,6 +68,12 @@ final class JITSession {
     var isTurningOn = false
     /// What the built-in helper said stopped it, while turning on.
     var helperFailure: String?
+    /// Turning on stopped because LocalDevVPN wasn't connected: it's tried
+    /// again when crate is next in front (`cameToFront()`).
+    var waitingForVPN = false
+    /// How many times crate has come to the front, so a check of the tunnel
+    /// can tell if crate came back from LocalDevVPN while it ran.
+    var cameToFrontCount = 0
     /// Built-in StikJIT isn't set up yet: shows the Set Up JIT sheet.
     var showingSetup = false
     /// Whether Built-in StikJIT has a pairing, for Settings' Set Up JIT row.

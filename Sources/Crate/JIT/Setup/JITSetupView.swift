@@ -34,7 +34,8 @@ struct JITSetupView: View {
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
                     .controlSize(.large)
-                    .disabled(!setup.isReady)
+                    // One helper at a time: not while Prepare Now runs.
+                    .disabled(!setup.isReady || setup.preparation == .working)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 }
@@ -193,7 +194,9 @@ struct JITSetupView: View {
             case .idle:
                 StepStatus(title: "Developer Disk Image", done: false, status: "Not Checked")
                 Button("Prepare Now", systemImage: "externaldrive.badge.checkmark") { setup.prepare() }
-                    .disabled(!setup.isReady)
+                    // One helper at a time: not while JIT is being turned on,
+                    // at launch say, which mounts the disk image itself.
+                    .disabled(!setup.isReady || jit.isTurningOn)
             case .working:
                 HStack {
                     Text("Developer Disk Image")
@@ -207,7 +210,7 @@ struct JITSetupView: View {
                 Text(message)
                     .foregroundStyle(.orange)
                 Button("Try Again", systemImage: "arrow.clockwise") { setup.prepare() }
-                    .disabled(!setup.isReady)
+                    .disabled(!setup.isReady || jit.isTurningOn)
             }
         } header: {
             Text("3. Prepare")
