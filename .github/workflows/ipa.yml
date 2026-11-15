@@ -3,9 +3,8 @@
 # (vX.Y), as a release. Install it with Scripts/sign-ipa.sh, which signs it
 # with this team's certificate and profiles, or sign it with any other.
 #
-# The libraries come prebuilt and pinned, as Scripts/fetch-*.sh get them on a
-# Mac: the frameworks release of this repository, and StikJIT's and crate's own
-# releases.
+# The iOS frameworks come prebuilt and pinned; the Crate engine is built
+# from ElequacityStudios/crate on main so changes to the fork reach the IPA.
 name: ipa
 on:
   push:
