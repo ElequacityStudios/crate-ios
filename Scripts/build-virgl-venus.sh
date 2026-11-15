@@ -86,7 +86,7 @@ git -C "$WORK/virglrenderer" clean -q -fdx
 export GIT_AUTHOR_NAME=crate-builder GIT_AUTHOR_EMAIL=crate-builder@local
 export GIT_COMMITTER_NAME=crate-builder GIT_COMMITTER_EMAIL=crate-builder@local
 export GIT_AUTHOR_DATE=2026-10-03T00:00:00Z GIT_COMMITTER_DATE=2026-10-03T00:00:00Z
-if ! git -C "$WORK/virglrenderer" merge -q --no-ff --no-edit "$UPSTREAM_COMMIT" > "$WORK/merge.log" 2>&1; then
+if ! git -C "$WORK/virglrenderer" merge -q --allow-unrelated-histories --no-ff --no-edit "$UPSTREAM_COMMIT" > "$WORK/merge.log" 2>&1; then
     if [ -n "$(git -C "$WORK/virglrenderer" diff --name-only --diff-filter=U)" ]; then
         (cd "$WORK/virglrenderer" && python3 "$STEAMAC_DIR/host/virglrenderer/merge-resolve.py")
         git -C "$WORK/virglrenderer" commit -q --no-edit
