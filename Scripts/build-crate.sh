@@ -31,8 +31,10 @@ grep -q "module CrateEngine" "$CRATE_DIR/tools/xcframework.sh" || {
 # context creation through virglrenderer_context_create_with_flags.
 if ! grep -q 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
     || ! grep -q 'F_CONTEXT_INIT: u64 = 1 << 4' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
-    || ! grep -q 'virgl_renderer_context_create_with_flags' "$CRATE_DIR/crates/crate-host/src/virgl.rs"; then
-    echo "crate checkout lacks complete virtio-gpu Venus context initialization support" >&2
+    || ! grep -q 'virgl_renderer_context_create_with_flags' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -q 'virgl_renderer_context_create_fence' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -q 'write_context_fence: Some(write_context_fence)' "$CRATE_DIR/crates/crate-host/src/virgl.rs"; then
+    echo "crate checkout lacks complete virtio-gpu Venus context initialization and timeline fences" >&2
     exit 1
 fi
 VERSION="$(git -C "$CRATE_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
