@@ -1,7 +1,7 @@
 diff --git a/src/venus/vkr_library.c b/src/venus/vkr_library.c
 --- a/src/venus/vkr_library.c
 +++ b/src/venus/vkr_library.c
-@@ -55,6 +55,6 @@ vkr_library_driver_path(void)
+@@ -48,6 +48,6 @@ vkr_library_driver_path(void)
  static const char *
  vkr_library_driver_path(void)
  {
