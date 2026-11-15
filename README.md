@@ -49,6 +49,22 @@ Linux comes first. From the Install tab, each with an account of your own:
 Coming soon: Omarchy with Hyprland (it runs, with bugs left to fix), custom
 Linux images of your own, and other operating systems.
 
+## Features
+
+- Ubuntu, Debian and Arch Linux ARM from a catalog, each with an account of your own
+- A disk size of your choice at install, and a memory limit you can change later
+- GPU-accelerated desktops: the guest's OpenGL runs on the iPhone's GPU
+- Touch as a tablet, a hardware keyboard, or the on-screen one with a key row
+  for Esc, Ctrl, Super, Tab, function keys and arrows
+- Supports a mouse or trackpad on iPad: wheel scrolling, right and middle click
+- An external monitor as the VM's screen, at the monitor's resolution, with the
+  iPhone or iPad as its trackpad (GNOME may need its resolution set by hand; see
+  [Known issues](#known-issues))
+- iPhone Duo layouts that follow the fold
+- The VM's serial console, a tab away from its desktop
+- JIT from crate's built-in StikJIT, or from StikDebug
+- Logs to share for bug reports, kept across a crash, with memory tracking
+
 ## Install
 
 crate needs JIT, which iOS gives only to an app a debugger has attached to, so
@@ -82,6 +98,10 @@ with iOS 27.1.
       <img src="docs/media/kde.png" alt="KDE Plasma's desktop with its application menu open, showing Firefox, System Settings and Dolphin, on an iPhone Duo"><br>
       <sub>Arch Linux ARM with KDE Plasma, its application menu open.</sub>
     </td>
+    <td align="center" width="33%">
+      <img src="docs/media/monitor.png" alt="Ubuntu's GNOME desktop filling an external monitor, with an iPhone Duo below it showing crate's trackpad"><br>
+      <sub>An external monitor as the VM's screen: Ubuntu fills the monitor, and the iPhone Duo becomes its trackpad.</sub>
+    </td>
   </tr>
 </table>
 
@@ -97,10 +117,10 @@ engine go to its repository.
    desktop, opening apps and building code, on the iPhone itself, so every
    change shows what it gains. Today's numbers are in the engine's
    [benchmarks](https://github.com/oneamendez/crate#benchmarks).
-2. **Monitors and devices.** An external monitor as the VM's screen, and the
-   keyboards, mice, game controllers, cameras, microphones, USB storage and
-   other devices iOS lets an app reach, passed through to the VM; the other
-   way, the VM's sound, clipboard and files reaching iOS.
+2. **Monitors and devices.** An external monitor already works as the VM's
+   screen. Next, the keyboards, mice, game controllers, cameras, microphones,
+   USB storage and other devices iOS lets an app reach, passed through to the
+   VM; the other way, the VM's sound, clipboard and files reaching iOS.
 3. **More systems.** Omarchy back in the catalog once its bugs are fixed,
    custom Linux images of your own, then other operating systems.
 
@@ -253,8 +273,13 @@ this project's own, `com.amendez.crate`.
   initrd from outside its disk, so the images hold their kernel packages at
   the version they shipped with. A kernel the guest installs anyway is never
   booted, and an upgrade can remove the modules the booted kernel needs.
-- **Xfce doesn't follow a new screen size.** On rotate or fold, labwc takes
-  the new size but the Xfce panel and desktop don't (see crate's docs/PLAN.md).
+- **Xfce's wallpaper doesn't follow a new screen size.** When the desktop
+  changes size, on an external monitor for one, Xfce's panel, icons and windows
+  follow it, but the wallpaper keeps its old size.
+- **GNOME may not resize to fit a monitor.** If Ubuntu's desktop doesn't fill
+  an external monitor, open Settings → Displays inside the VM and pick a
+  resolution with the monitor's aspect ratio, such as 1920 × 1080 for a 16:9
+  monitor.
 
 ## License
 
