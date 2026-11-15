@@ -101,10 +101,20 @@ for patch in "$STEAMAC_DIR"/host/virglrenderer/patches/*.patch; do
     git -C "$WORK/virglrenderer" apply --whitespace=nowarn "$patch"
 done
 
-# Venus's loader normally asks dyld for libMoltenVK.dylib, while the iOS app
-# embeds MoltenVK as a framework. Teach it the framework's actual @rpath path.
-git -C "$WORK/virglrenderer" apply --whitespace=nowarn \
-    "$REPO/Scripts/patches/virglrenderer-moltenvk-framework-loader.patch"
+# The pinned steamac loader defaults to libMoltenVK.dylib. This app embeds
+# MoltenVK as a framework, so change the default while preserving the env override.
+python3 - "$WORK/virglrenderer/src/venus/vkr_library.c" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+old = 'return path && *path ? path : "@rpath/libMoltenVK.dylib";'
+new = 'return path && *path ? path : "@rpath/MoltenVK.framework/MoltenVK";'
+if source.count(old) != 1:
+    raise SystemExit("could not find the unique VKR_VULKAN_DRIVER default in vkr_library.c")
+path.write_text(source.replace(old, new))
+PY
 
 # The Venus protocol generator needs Mako; Gallium's generators need PyYAML.
 python3 -m venv "$WORK/venv"

@@ -45,7 +45,7 @@ jobs:
           ref: main
           path: crate
       - uses: dtolnay/rust-toolchain@stable
-      - name: Test virtio devices, host-visible blobs and VM construction
+      - name: Test virtio devices, blob scanout and Venus VM construction
         run: cargo test --all-targets -p crate-devices -p crate-host -p crate-virt
         working-directory: crate
       - name: Frameworks
