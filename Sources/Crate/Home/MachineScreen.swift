@@ -76,6 +76,9 @@ struct MachineScreen: View {
                 }
                 .sensoryFeedback(.impact(weight: .light), trigger: screenshot?.id)
         }
+        // A connected display shows the VM's screen while this is up, the
+        // console included (ExternalDisplay).
+        .background { ExternalDisplayRegistration(bridge: runner.display) }
         .preferredColorScheme(.dark)
         .modifier(FollowsHinge(folds: $folds, isOpen: $isOpen))
         .task(id: jit.isOn) { boot() }

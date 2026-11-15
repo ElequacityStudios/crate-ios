@@ -11,9 +11,19 @@ import Foundation
 ///
 /// crate hands over a frame with the part that changed marked: that part is
 /// copied into a buffer of the whole screen, and the main thread is handed a
-/// picture of it, a frame at a time however fast they come. crate makes frames
-/// only while the display is active, which the view turns on while it shows.
+/// picture of it, a frame at a time however fast they come. Up to two viewers
+/// are handed the same picture: the app's own view, and an external display
+/// (ExternalDisplay). crate makes frames only while the display is active,
+/// which it is while either viewer shows it.
 final class DisplayBridge: @unchecked Sendable {
+    /// Who's showing the screen.
+    enum Viewer: Hashable {
+        /// The display view, on the iPhone or iPad itself.
+        case app
+        /// A connected display, while it shows the VM's screen.
+        case external
+    }
+
     private let lock = NSLock()
     private var machine: OpaquePointer?
     /// The machine's one display.
@@ -23,15 +33,23 @@ final class DisplayBridge: @unchecked Sendable {
     private var width = 0
     private var height = 0
     private var flushScheduled = false
-    private var sink: (@MainActor (CGImage) -> Void)?
+    /// Each viewer's, handed the screen as it is now, or nil once there's none.
+    private var sinks: [Viewer: @MainActor (CGImage?) -> Void] = [:]
     private var wantsActive = false
-    /// The VM's own size and a few common ones, offered after the size that
-    /// fits the view.
+    /// The VM's own size and a few common ones, offered after the preferred
+    /// size.
     private var otherModes: [crate_display_mode] = []
     /// The size that fits the view, once it has one.
     private var fitted: crate_display_mode?
+    /// The external display's size, while it shows the screen: offered
+    /// instead of the view's, which is kept meanwhile for when it goes.
+    private var external: crate_display_mode?
+    /// What the guest is offered first.
+    private var preferred: crate_display_mode? { external ?? fitted }
     /// What the guest was last offered, so the same offer isn't made twice.
     private var offered: crate_display_mode?
+    /// See pointerPosition.
+    private var lastPointer = CGPoint(x: 0.5, y: 0.5)
 
     /// For crate_config_add_display; `self` outlives the machine.
     var callbacks: crate_display_callbacks {
@@ -59,12 +77,13 @@ final class DisplayBridge: @unchecked Sendable {
 
     // MARK: - The guest's size
 
-    /// The sizes for a new machine: the one that fits the view first, if the
-    /// view has been laid out, then `others`, which later offers keep.
+    /// The sizes for a new machine: the external display's first, if one is
+    /// showing the screen, or else the one that fits the view, if the view has
+    /// been laid out; then `others`, which later offers keep.
     func modes(after others: [crate_display_mode]) -> [crate_display_mode] {
         lock.withLock {
             otherModes = others
-            offered = fitted
+            offered = preferred
             return list()
         }
     }
@@ -105,13 +124,14 @@ final class DisplayBridge: @unchecked Sendable {
         pendingFit?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            let changed = lock.withLock { () -> Bool in
-                guard self.fitted?.width != mode.width || self.fitted?.height != mode.height else { return false }
+            let (changed, deferred) = lock.withLock { () -> (Bool, Bool) in
+                guard self.fitted?.width != mode.width || self.fitted?.height != mode.height else { return (false, false) }
                 self.fitted = mode
-                return true
+                return (true, self.external != nil)
             }
             guard changed else { return }
-            AppLog.write("display: \(mode.width)x\(mode.height) fits \(Int(points.width))x\(Int(points.height)) pt")
+            AppLog.write("display: \(mode.width)x\(mode.height) fits \(Int(points.width))x\(Int(points.height)) pt"
+                         + (deferred ? ", offered once the external display goes" : ""))
             offerModes()
         }
         pendingFit = work
@@ -121,6 +141,34 @@ final class DisplayBridge: @unchecked Sendable {
     }
     @MainActor private var pendingFit: DispatchWorkItem?
 
+    /// While an external display shows the screen, the guest is offered a
+    /// desktop of the display's shape and size (`pixels`, its own) instead of
+    /// the view's: the iPhone or iPad is then only where the person points and
+    /// types. The view's latest size is kept meanwhile, and offered again once
+    /// the display goes (nil).
+    @MainActor
+    func fitExternal(_ pixels: CGSize?) {
+        let mode = pixels.flatMap(Self.mode(forPixels:))
+        let (changed, view) = lock.withLock { () -> (Bool, crate_display_mode?) in
+            guard external?.width != mode?.width || external?.height != mode?.height else { return (false, nil) }
+            external = mode
+            return (true, fitted)
+        }
+        guard changed else { return }
+        if let mode, let pixels {
+            AppLog.write("display: \(mode.width)x\(mode.height) fits the external display's \(Int(pixels.width))x\(Int(pixels.height)) px")
+        } else if let view {
+            AppLog.write("display: \(view.width)x\(view.height) fits the view again")
+        }
+        // A display can connect, go and come back within a moment as it
+        // settles (the Simulator's does): only where it ends up is offered.
+        pendingExternal?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.offerModes() }
+        pendingExternal = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+    @MainActor private var pendingExternal: DispatchWorkItem?
+
     /// A guest pixel for each point, so the desktop's text is the size of the
     /// app's, but at least 600 pixels on the short side, where a desktop's
     /// windows start to fit, and at most 2560 on the long one. Multiples of 8.
@@ -129,23 +177,35 @@ final class DisplayBridge: @unchecked Sendable {
     nonisolated static func mode(fitting points: CGSize) -> crate_display_mode? {
         let short = min(points.width, points.height), long = max(points.width, points.height)
         guard short >= 100 else { return nil }
-        let scale = min(max(1, 600 / short), 2560 / long)
+        return landscape(long: long, short: short, scale: min(max(1, 600 / short), 2560 / long))
+    }
+
+    /// An external display's own pixels, a guest pixel each, but at most 2560
+    /// on the long side: each frame shown is read back from the GPU and copied,
+    /// which at 4K costs far more than it shows. Multiples of 8, landscape.
+    nonisolated static func mode(forPixels pixels: CGSize) -> crate_display_mode? {
+        let short = min(pixels.width, pixels.height), long = max(pixels.width, pixels.height)
+        guard short >= 100 else { return nil }
+        return landscape(long: long, short: short, scale: min(1, 2560 / long))
+    }
+
+    private nonisolated static func landscape(long: CGFloat, short: CGFloat, scale: CGFloat) -> crate_display_mode {
         let round8 = { (v: CGFloat) in UInt32(max(8, (v * scale / 8).rounded() * 8)) }
         return crate_display_mode(width: round8(long), height: round8(short))
     }
 
-    /// The fitting size first, then the others.
+    /// The preferred size first, then the others.
     private func list() -> [crate_display_mode] {
-        guard let fitted else { return otherModes }
-        return [fitted] + otherModes.filter { $0.width != fitted.width || $0.height != fitted.height }
+        guard let preferred else { return otherModes }
+        return [preferred] + otherModes.filter { $0.width != preferred.width || $0.height != preferred.height }
     }
 
-    /// Tells a running machine about a new fitting size.
+    /// Tells a running machine about a new preferred size.
     private func offerModes() {
         let offer = lock.withLock { () -> (OpaquePointer, [crate_display_mode])? in
-            guard let machine, let fitted, !otherModes.isEmpty,
-                  offered?.width != fitted.width || offered?.height != fitted.height else { return nil }
-            offered = fitted
+            guard let machine, let preferred, !otherModes.isEmpty,
+                  offered?.width != preferred.width || offered?.height != preferred.height else { return nil }
+            offered = preferred
             return (machine, list())
         }
         // Outside the lock, which crate's GPU thread takes to hand over frames.
@@ -154,45 +214,72 @@ final class DisplayBridge: @unchecked Sendable {
         }
     }
 
+    /// The VM stopped: its screen goes too, so an external display still
+    /// showing it, or one connected later, doesn't show a VM that's gone.
+    @MainActor
     func detach() {
         lock.withLock { machine = nil }
+        forgetScreen()
     }
 
     /// A new boot: forget the last one's screen, so a VM that never shows its
     /// display isn't taken for one showing another's.
+    @MainActor
     func reset() {
-        lock.withLock {
+        forgetScreen()
+    }
+
+    @MainActor
+    private func forgetScreen() {
+        let sinks = lock.withLock { () -> [@MainActor (CGImage?) -> Void] in
             pixels?.deallocate()
             pixels = nil
             width = 0
             height = 0
+            return Array(self.sinks.values)
         }
+        for sink in sinks { sink(nil) }
     }
 
-    // MARK: - The view's side, on the main thread
+    // MARK: - The viewers' side, on the main thread
 
-    /// Starts handing `sink` pictures, and asks crate for frames.
+    /// Starts handing `viewer`'s `sink` pictures, and asks crate for frames if
+    /// it's the first.
     @MainActor
-    func connect(_ sink: @escaping @MainActor (CGImage) -> Void) {
+    func connect(_ viewer: Viewer, _ sink: @escaping @MainActor (CGImage?) -> Void) {
         let machine = lock.withLock { () -> OpaquePointer? in
-            self.sink = sink
+            let first = sinks.isEmpty
+            sinks[viewer] = sink
             wantsActive = true
-            return self.machine
+            return first ? self.machine : nil
         }
         if let machine { crate_display_set_active(machine, index, true) }
         if let image = picture() { sink(image) }
+        if viewer == .external { onExternalChange?(true) }
     }
 
-    /// Stops the frames while nothing shows them: they cost a copy each.
+    /// Stops the frames once nothing shows them: they cost a copy each.
     @MainActor
-    func disconnect() {
-        let machine = lock.withLock { () -> OpaquePointer? in
-            sink = nil
+    func disconnect(_ viewer: Viewer) {
+        let (removed, machine) = lock.withLock { () -> (Bool, OpaquePointer?) in
+            guard sinks.removeValue(forKey: viewer) != nil else { return (false, nil) }
+            guard sinks.isEmpty else { return (true, nil) }
             wantsActive = false
-            return self.machine
+            return (true, self.machine)
         }
         if let machine { crate_display_set_active(machine, index, false) }
+        if removed, viewer == .external { onExternalChange?(false) }
     }
+
+    /// Whether an external display shows the screen now.
+    @MainActor
+    var isShownExternally: Bool {
+        lock.withLock { sinks[.external] != nil }
+    }
+
+    /// The app's view, told when an external display starts or stops showing
+    /// the screen: meanwhile it's a trackpad for the pointer there.
+    @MainActor var onExternalChange: ((Bool) -> Void)?
 
     /// The screen's size in pixels, once a frame has come.
     var size: CGSize {
@@ -210,13 +297,20 @@ final class DisplayBridge: @unchecked Sendable {
 
     /// `x` and `y` from 0 to 1 across the screen.
     func pointer(x: Double, y: Double, buttons: UInt32) {
+        let x = max(0, min(1, x)), y = max(0, min(1, y))
         let scale = 32767.0
-        let px = UInt32(max(0, min(1, x)) * scale)
-        let py = UInt32(max(0, min(1, y)) * scale)
         lock.withLock {
+            lastPointer = CGPoint(x: x, y: y)
             guard let machine else { return }
-            crate_input_pointer(machine, px, py, buttons)
+            crate_input_pointer(machine, UInt32(x * scale), UInt32(y * scale), buttons)
         }
+    }
+
+    /// Where the guest's pointer was last put, 0 to 1 across the screen each
+    /// way: kept here, which outlives the display view, so a trackpad carries
+    /// on from where the pointer is after the view is made again.
+    var pointerPosition: CGPoint {
+        lock.withLock { lastPointer }
     }
 
     func scroll(dx: Int32, dy: Int32) {
@@ -250,19 +344,21 @@ final class DisplayBridge: @unchecked Sendable {
                 let to = pixels.advanced(by: (row * w + dirtyX) * 4)
                 to.copyMemory(from: from, byteCount: min(dirtyW, w - dirtyX) * 4)
             }
-            guard sink != nil, !flushScheduled else { return }
+            guard !sinks.isEmpty, !flushScheduled else { return }
             flushScheduled = true
             DispatchQueue.main.async { self.flush() }
         }
     }
 
+    /// One picture for both viewers: it's the copy that costs.
     @MainActor
     private func flush() {
-        let sink = lock.withLock { () -> (@MainActor (CGImage) -> Void)? in
+        let sinks = lock.withLock { () -> [@MainActor (CGImage?) -> Void] in
             flushScheduled = false
-            return self.sink
+            return Array(self.sinks.values)
         }
-        if let sink, let image = picture() { sink(image) }
+        guard !sinks.isEmpty, let image = picture() else { return }
+        for sink in sinks { sink(image) }
     }
 
     /// The screen so far, at the guest's own size: what a screenshot is of.
@@ -270,8 +366,11 @@ final class DisplayBridge: @unchecked Sendable {
 
     #if DEBUG
     /// Debug builds pretending JIT is on: `image` as the screen, so the
-    /// display can be tried without a VM.
+    /// display can be tried without a VM. It goes to any viewer already
+    /// showing the screen, as a frame would: an external display is.
+    @MainActor
     func pretend(_ image: CGImage) {
+        defer { flush() }
         lock.withLock {
             pixels?.deallocate()
             width = image.width

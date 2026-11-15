@@ -13,6 +13,12 @@ import UIKit
 /// themselves, and its wheel or two-finger scroll scrolls what's under it.
 /// Typing comes from iOS's keyboard (`showsKeyboard`), with a row of extra keys
 /// above it (DisplayKeyBar), or a hardware one, as Linux key codes.
+///
+/// While an external display shows the screen (ExternalDisplay), this view is
+/// a trackpad for the pointer there instead, as a laptop's is: one finger moves
+/// it, a tap clicks, two fingers tapped click the right button or dragged
+/// scroll, and holding a finger still, then moving it, drags. A mouse moves the
+/// pointer across the display as it moves across the view.
 struct DisplayView: UIViewRepresentable {
     let bridge: DisplayBridge
     @Binding var showsKeyboard: Bool
@@ -26,10 +32,15 @@ struct DisplayView: UIViewRepresentable {
         let view = ScreenView(bridge: bridge)
         view.onKeyboardHidden = { showsKeyboard = false }
         let hasPicture = $hasPicture
-        bridge.connect { [weak view] image in
+        // No screen is the VM stopping, which MachineScreen shows in place
+        // of this view.
+        bridge.connect(.app) { [weak view] image in
+            guard let image else { return }
             view?.show(image)
             if !hasPicture.wrappedValue { hasPicture.wrappedValue = true }
         }
+        view.isTrackpad = bridge.isShownExternally
+        bridge.onExternalChange = { [weak view] shown in view?.isTrackpad = shown }
         return view
     }
 
@@ -44,7 +55,7 @@ struct DisplayView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: ScreenView, coordinator: ()) {
-        view.bridge.disconnect()
+        view.bridge.disconnect(.app)
     }
 
     final class ScreenView: UIView, UIKeyInput, UIGestureRecognizerDelegate, UIPointerInteractionDelegate {
@@ -71,6 +82,39 @@ struct DisplayView: UIViewRepresentable {
         /// First responder while the on-screen keyboard is down, for a
         /// hardware keyboard's keys (takeHardwareKeys).
         private let keyCatcher = KeyCatcher()
+        /// Whether this is a trackpad, while an external display shows the
+        /// screen: the picture goes from here, the pointer is moved by how far
+        /// a finger moves rather than to where it is, and a tap clicks where
+        /// the pointer is.
+        var isTrackpad = false {
+            didSet {
+                guard isTrackpad != oldValue else { return }
+                AppLog.write("display: \(isTrackpad ? "a trackpad for the external display" : "the screen again")")
+                // A drag the change cuts short lets go, and a finger already
+                // down starts again: a trackpad move doesn't go on as a drag
+                // across the picture, nor a drag as a trackpad move.
+                if pressed != 0 { press(0) }
+                for gesture in fingerGestures where gesture.state == .began || gesture.state == .changed {
+                    gesture.isEnabled = false
+                    gesture.isEnabled = true
+                }
+                twoFingerTap.isEnabled = isTrackpad
+                // Where the mouse was is in the other way of mapping the view.
+                mouse = nil
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                placePicture()
+                CATransaction.commit()
+            }
+        }
+        /// What a finger drives, so a change of mode can stop what's going on.
+        private var fingerGestures: [UIGestureRecognizer] = []
+        /// Where a finger held for a drag last was, on the trackpad.
+        private var dragFrom = CGPoint.zero
+        /// The trackpad's right click; only on while this is one.
+        private let twoFingerTap = UITapGestureRecognizer()
+        /// What shows on the view while it's a trackpad.
+        private let surface = TrackpadSurface()
         /// See DisplayView.openRegion. The picture moves as the iPhone folds,
         /// and the desktop takes the shape of where it now goes.
         var openRegion: CGRect? {
@@ -90,6 +134,8 @@ struct DisplayView: UIViewRepresentable {
             backgroundColor = .black
             picture.magnificationFilter = .linear
             layer.addSublayer(picture)
+            surface.isHidden = true
+            addSubview(surface)
             isMultipleTouchEnabled = true
             keyCatcher.owner = self
             addSubview(keyCatcher)
@@ -127,8 +173,12 @@ struct DisplayView: UIViewRepresentable {
             middleClick.require(toFail: tap)
             pointerOnly = [wheel, glide, hover]
             primaryOnly = [drag, hold]
+            fingerGestures = [tap, drag, hold, scroll]
+            twoFingerTap.addTarget(self, action: #selector(twoFingerTapped))
+            twoFingerTap.numberOfTouchesRequired = 2
+            twoFingerTap.isEnabled = false
 
-            for recognizer in [tap, drag, hold, scroll, wheel, glide, hover, rightClick, middleClick] {
+            for recognizer in [tap, drag, hold, scroll, wheel, glide, hover, rightClick, middleClick, twoFingerTap] {
                 recognizer.delegate = self
                 addGestureRecognizer(recognizer)
             }
@@ -162,7 +212,21 @@ struct DisplayView: UIViewRepresentable {
         /// hides (pointerInteraction(_:regionFor:defaultRegion:)).
         private func placePicture() {
             picture.frame = screenRect
+            picture.isHidden = isTrackpad
+            surface.isHidden = !isTrackpad
+            surface.frame = surfaceRect
             pointerInteraction.invalidate()
+        }
+
+        /// The trackpad's surface: the open region (all of the view, or above
+        /// the fold), less what the keyboard covers, inside the safe area.
+        private var surfaceRect: CGRect {
+            var region = (openRegion.map { $0.intersection(bounds) } ?? bounds)
+                .inset(by: safeAreaInsets)
+            if keyboardOverlap > 0 {
+                region.size.height = max(0, min(region.maxY, bounds.height - keyboardOverlap) - region.minY)
+            }
+            return region.insetBy(dx: 12, dy: 12)
         }
 
         /// The guest's desktop takes the view's shape (DisplayBridge.fit), but
@@ -243,9 +307,48 @@ struct DisplayView: UIViewRepresentable {
         /// passing over the picture, or scrolling it, isn't a click on it.
         private func move(to location: CGPoint, buttons: UInt32? = nil) {
             if let buttons { pressed = buttons }
-            let rect = screenRect
-            bridge.pointer(x: (location.x - rect.minX) / rect.width,
-                           y: (location.y - rect.minY) / rect.height, buttons: pressed)
+            let area = pointerArea
+            bridge.pointer(x: (location.x - area.minX) / area.width,
+                           y: (location.y - area.minY) / area.height, buttons: pressed)
+        }
+
+        /// What a place in the view is taken across: the picture, or on a
+        /// trackpad, where there's none, all of the view, so a mouse reaches
+        /// every corner of the external display's screen.
+        private var pointerArea: CGRect {
+            isTrackpad ? bounds : screenRect
+        }
+
+        // MARK: Touch as a trackpad
+
+        /// `buttons` down where the pointer is.
+        private func press(_ buttons: UInt32) {
+            pressed = buttons
+            let at = bridge.pointerPosition
+            bridge.pointer(x: at.x, y: at.y, buttons: buttons)
+        }
+
+        private func clickAtPointer(_ buttons: UInt32) {
+            takeHardwareKeys()
+            press(0)
+            press(buttons)
+            press(0)
+        }
+
+        /// The pointer moved by a finger's `moved` points, going `speed`
+        /// points a second: a guest pixel and a half a point, up to three
+        /// times that when the finger flicks, so a slow move is precise and a
+        /// quick one crosses the screen.
+        private func nudge(by moved: CGPoint, speed: CGFloat) {
+            let screen = imageSize.width > 0 ? imageSize : CGSize(width: 1920, height: 1080)
+            let gain = 1.5 * (1 + min(max((speed - 150) / 500, 0), 2))
+            let at = bridge.pointerPosition
+            bridge.pointer(x: at.x + moved.x * gain / screen.width,
+                           y: at.y + moved.y * gain / screen.height, buttons: pressed)
+        }
+
+        @objc private func twoFingerTapped(_ recognizer: UITapGestureRecognizer) {
+            clickAtPointer(2)
         }
 
         private func click(_ recognizer: UIGestureRecognizer, buttons: UInt32) {
@@ -254,11 +357,32 @@ struct DisplayView: UIViewRepresentable {
             point(recognizer, buttons: 0)
         }
 
+        /// On a trackpad, where the pointer is, which is where a mouse
+        /// clicking is too: it moved the pointer there on its way.
         @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
-            click(recognizer, buttons: 1)
+            if isTrackpad {
+                clickAtPointer(1)
+            } else {
+                click(recognizer, buttons: 1)
+            }
         }
 
+        /// On a trackpad, the pointer moves with the finger, no button down.
         @objc private func dragged(_ recognizer: UIPanGestureRecognizer) {
+            // Stopped by a change of mode: whatever was down lets go, where
+            // the pointer is.
+            if recognizer.state == .cancelled {
+                if pressed != 0 { press(0) }
+                return
+            }
+            if isTrackpad {
+                if recognizer.state == .began { takeHardwareKeys() }
+                let moved = recognizer.translation(in: self)
+                recognizer.setTranslation(.zero, in: self)
+                let velocity = recognizer.velocity(in: self)
+                nudge(by: moved, speed: hypot(velocity.x, velocity.y))
+                return
+            }
             // A mouse dragging sends no hovers: its place is where it drags,
             // so a wheel turned mid-drag scrolls there, button still down.
             mouse = recognizer.location(in: self)
@@ -268,15 +392,36 @@ struct DisplayView: UIViewRepresentable {
             }
         }
 
+        /// On a trackpad, a finger held still holds the button down, with a
+        /// tap of the Taptic Engine to say so, and moving it drags; lifting it
+        /// lets go. Otherwise it's the right button, clicked.
         @objc private func held(_ recognizer: UILongPressGestureRecognizer) {
+            if isTrackpad {
+                let location = recognizer.location(in: self)
+                switch recognizer.state {
+                case .began:
+                    takeHardwareKeys()
+                    dragFrom = location
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    press(1)
+                case .changed:
+                    nudge(by: CGPoint(x: location.x - dragFrom.x, y: location.y - dragFrom.y), speed: 0)
+                    dragFrom = location
+                default:
+                    press(0)
+                }
+                return
+            }
             guard recognizer.state == .began else { return }
             click(recognizer, buttons: 2)
         }
 
+        /// On a trackpad, what's under the pointer scrolls; otherwise what's
+        /// under the fingers.
         @objc private func scrolled(_ recognizer: UIPanGestureRecognizer) {
             if recognizer.state == .began {
                 scrollCarry = .zero
-                point(recognizer, buttons: 0)
+                if !isTrackpad { point(recognizer, buttons: 0) }
             }
             scrollByDistance(recognizer)
         }
@@ -369,7 +514,7 @@ struct DisplayView: UIViewRepresentable {
         /// one; over the bars beside it, as anywhere else.
         func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest,
                                 defaultRegion: UIPointerRegion) -> UIPointerRegion? {
-            let rect = screenRect
+            let rect = pointerArea
             return rect.contains(request.location) ? UIPointerRegion(rect: rect) : nil
         }
 
@@ -506,6 +651,66 @@ struct DisplayView: UIViewRepresentable {
 
         override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
             owner?.pressesCancelled(presses, with: event)
+        }
+    }
+
+    /// The trackpad, drawn: a panel saying the desktop is on the external
+    /// display and how to point at it. Touches pass through to ScreenView,
+    /// whose gestures it is. The how-to goes when there's too little room.
+    final class TrackpadSurface: UIView {
+        private let icon = UIImageView(image: UIImage(systemName: "display"))
+        private let title = UILabel()
+        private let hint = UILabel()
+        private let stack: UIStackView
+
+        override init(frame: CGRect) {
+            stack = UIStackView(arrangedSubviews: [icon, title, hint])
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+            overrideUserInterfaceStyle = .dark
+            backgroundColor = UIColor(white: 1, alpha: 0.06)
+            layer.cornerRadius = 22
+            layer.cornerCurve = .continuous
+            layer.borderWidth = 1
+            layer.borderColor = UIColor(white: 1, alpha: 0.12).cgColor
+
+            icon.tintColor = .tertiaryLabel
+            icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .title1)
+            icon.contentMode = .scaleAspectFit
+            title.text = "Trackpad"
+            title.font = .preferredFont(forTextStyle: .headline)
+            title.textColor = .secondaryLabel
+            hint.text = "The desktop is on the external display.\n"
+                + "One finger moves the pointer, and a tap clicks.\n"
+                + "Two fingers tap to right-click, or move to scroll.\n"
+                + "Hold a finger still, then move it, to drag."
+            hint.font = .preferredFont(forTextStyle: .footnote)
+            hint.textColor = .tertiaryLabel
+            hint.numberOfLines = 0
+            hint.textAlignment = .center
+            for label in [title, hint] { label.adjustsFontForContentSizeCategory = true }
+
+            stack.axis = .vertical
+            stack.alignment = .center
+            stack.spacing = 8
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.centerXAnchor.constraint(equalTo: centerXAnchor),
+                stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+                stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -32),
+                stack.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+            ])
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func layoutSubviews() {
+            hint.isHidden = bounds.height < 200
+            icon.isHidden = bounds.height < 110
+            title.isHidden = bounds.height < 40
+            super.layoutSubviews()
         }
     }
 }
