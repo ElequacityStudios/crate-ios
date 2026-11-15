@@ -151,7 +151,7 @@ struct DisplayView: UIViewRepresentable {
             captureStyle.baseForegroundColor = .white
             captureStyle.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
             captureButton.configuration = captureStyle
-            captureButton.accessibilityHint = "Send raw mouse movement to the virtual machine, even when the iOS pointer reaches the edge"
+            captureButton.accessibilityHint = "Send raw mouse movement to the virtual machine. iOS may still move its system pointer outside the app; tap Release mouse to stop capture."
             captureButton.addTarget(self, action: #selector(toggleMouseCapture), for: .touchUpInside)
             captureButton.translatesAutoresizingMaskIntoConstraints = false
             captureButton.isHidden = true
@@ -590,6 +590,7 @@ struct DisplayView: UIViewRepresentable {
         private func setMouseCapture(_ captured: Bool) {
             guard mouseDevice != nil else { return }
             mouseCaptured = captured
+            pointerInteraction.invalidate()
             if captured, let input = mouseDevice?.mouseInput {
                 mouseButtons = (input.leftButton.isPressed ? 1 : 0)
                     | (input.rightButton?.isPressed == true ? 2 : 0)
@@ -618,7 +619,9 @@ struct DisplayView: UIViewRepresentable {
         /// one; over the bars beside it, as anywhere else.
         func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest,
                                 defaultRegion: UIPointerRegion) -> UIPointerRegion? {
-            let rect = pointerArea
+            // While captured, hide the system pointer anywhere in this view,
+            // not just over the guest's letterboxed picture.
+            let rect = mouseCaptured ? bounds : pointerArea
             return rect.contains(request.location) ? UIPointerRegion(rect: rect) : nil
         }
 
