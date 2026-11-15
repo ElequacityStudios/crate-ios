@@ -45,7 +45,7 @@ jobs:
           ref: main
           path: crate
       - uses: dtolnay/rust-toolchain@stable
-      - name: Test blob scanout backing reads and Venus VM construction
+      - name: Test blob scanout and per-context Venus fences
         run: cargo test --all-targets -p crate-devices -p crate-host -p crate-virt
         working-directory: crate
       - name: Frameworks
