@@ -251,7 +251,7 @@ final class MachineRunner {
                 let modes = settings.displayModes
                 return check(crate_config_set_display_modes(config, index, modes, modes.count), "the display's sizes")
             },
-            { check(crate_config_add_input(config, CRATE_INPUT_KEYBOARD | CRATE_INPUT_TABLET), "the keyboard and tablet") },
+            { check(crate_config_add_input(config, CRATE_INPUT_KEYBOARD | CRATE_INPUT_TABLET | CRATE_INPUT_MOUSE), "the keyboard, tablet and mouse") },
             {
                 check(crate_config_set_state_callback(config, { context, state, reason in
                     guard let context, state == CRATE_STATE_STOPPED else { return }

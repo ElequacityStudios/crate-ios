@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import GameController
 import SwiftUI
 import UIKit
 
@@ -66,6 +67,11 @@ struct DisplayView: UIViewRepresentable {
         /// The buttons the guest last heard were down, which the pointer
         /// keeps as it moves: a wheel turned mid-drag doesn't let go.
         private var pressed: UInt32 = 0
+        /// A physical mouse's raw input, used only while the guest has capture.
+        private var mouseDevice: GCMouse?
+        private var mouseCaptured = false
+        private var mouseButtons: UInt32 = 0
+        private let captureButton = UIButton(type: .system)
         /// Where the mouse last hovered over the view.
         private var mouse: CGPoint?
         /// What only a mouse or trackpad drives, never a touch.
@@ -139,6 +145,21 @@ struct DisplayView: UIViewRepresentable {
             isMultipleTouchEnabled = true
             keyCatcher.owner = self
             addSubview(keyCatcher)
+            var captureStyle = UIButton.Configuration.filled()
+            captureStyle.title = "Capture mouse"
+            captureStyle.baseBackgroundColor = UIColor.systemBlue.withAlphaComponent(0.9)
+            captureStyle.baseForegroundColor = .white
+            captureStyle.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+            captureButton.configuration = captureStyle
+            captureButton.accessibilityHint = "Send raw mouse movement to the virtual machine, even when the iOS pointer reaches the edge"
+            captureButton.addTarget(self, action: #selector(toggleMouseCapture), for: .touchUpInside)
+            captureButton.translatesAutoresizingMaskIntoConstraints = false
+            captureButton.isHidden = true
+            addSubview(captureButton)
+            NSLayoutConstraint.activate([
+                captureButton.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 8),
+                captureButton.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -8),
+            ])
 
             let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
             let drag = UIPanGestureRecognizer(target: self, action: #selector(dragged))
@@ -191,6 +212,11 @@ struct DisplayView: UIViewRepresentable {
                                name: UIResponder.keyboardWillHideNotification, object: nil)
             center.addObserver(self, selector: #selector(keyboardDidHide),
                                name: UIResponder.keyboardDidHideNotification, object: nil)
+            center.addObserver(self, selector: #selector(mouseBecameCurrent(_:)),
+                               name: .GCMouseDidBecomeCurrent, object: nil)
+            center.addObserver(self, selector: #selector(mouseDisconnected(_:)),
+                               name: .GCMouseDidDisconnect, object: nil)
+            if let mouse = GCMouse.current ?? GCMouse.mice().first { configureMouse(mouse) }
         }
 
         @available(*, unavailable)
@@ -431,7 +457,7 @@ struct DisplayView: UIViewRepresentable {
         @objc private func glided(_ recognizer: UIPanGestureRecognizer) {
             if recognizer.state == .began {
                 scrollCarry = .zero
-                moveToMouse(recognizer)
+                if !mouseCaptured { moveToMouse(recognizer) }
             }
             scrollByDistance(recognizer)
         }
@@ -441,7 +467,7 @@ struct DisplayView: UIViewRepresentable {
         /// moves the pan, so it's the scroll events that move it that count,
         /// taken to be one a click, not the distance.
         @objc private func wheeled(_ recognizer: UIPanGestureRecognizer) {
-            if recognizer.state == .began { moveToMouse(recognizer) }
+            if recognizer.state == .began && !mouseCaptured { moveToMouse(recognizer) }
             let moved = recognizer.translation(in: self)
             recognizer.setTranslation(.zero, in: self)
             let notch = { (distance: CGFloat) -> Int32 in distance < 0 ? 1 : distance > 0 ? -1 : 0 }
@@ -461,6 +487,7 @@ struct DisplayView: UIViewRepresentable {
         /// Its going (leaving the view, say) isn't a move: the pointer stays
         /// where it last was, not where the end puts it, the view's corner.
         @objc private func hovered(_ recognizer: UIHoverGestureRecognizer) {
+            guard !mouseCaptured else { return }
             switch recognizer.state {
             case .began, .changed:
                 let location = recognizer.location(in: self)
@@ -483,7 +510,10 @@ struct DisplayView: UIViewRepresentable {
         /// A mouse's other buttons pressed aren't the left one held down, or a
         /// long press: they click as themselves, and nothing else sees them.
         func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive event: UIEvent) -> Bool {
-            !primaryOnly.contains(recognizer) || event.buttonMask.isSubset(of: .primary)
+            // In capture mode GameController supplies the mouse's raw movement
+            // and buttons; don't also treat its UIKit pointer events as touches.
+            if mouseCaptured && !event.buttonMask.isEmpty { return false }
+            return !primaryOnly.contains(recognizer) || event.buttonMask.isSubset(of: .primary)
         }
 
         /// The mouse moving or scrolling goes along with whatever else is
@@ -505,6 +535,77 @@ struct DisplayView: UIViewRepresentable {
                 bridge.scroll(dx: dx, dy: dy)
                 scrollCarry.x += CGFloat(dx) * notch
                 scrollCarry.y += CGFloat(dy) * notch
+            }
+        }
+
+
+        // MARK: Relative mouse capture
+
+        @objc private func mouseBecameCurrent(_ note: Notification) {
+            guard let mouse = note.object as? GCMouse else { return }
+            configureMouse(mouse)
+        }
+
+        @objc private func mouseDisconnected(_ note: Notification) {
+            guard let disconnected = note.object as? GCMouse,
+                  disconnected === mouseDevice else { return }
+            setMouseCapture(false)
+            mouseDevice = nil
+            if let next = GCMouse.current ?? GCMouse.mice().first {
+                configureMouse(next)
+            } else {
+                captureButton.isHidden = true
+            }
+        }
+
+        private func configureMouse(_ mouse: GCMouse) {
+            guard let input = mouse.mouseInput else { return }
+            mouseDevice = mouse
+            captureButton.isHidden = false
+            input.mouseMovedHandler = { [weak self] _, dx, dy in
+                DispatchQueue.main.async {
+                    guard let self, self.mouseCaptured else { return }
+                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: Int32(dy.rounded()),
+                                      buttons: self.mouseButtons)
+                }
+            }
+            input.leftButton.valueChangedHandler = { [weak self] _, _, down in
+                DispatchQueue.main.async { self?.setMouseButton(1, down: down) }
+            }
+            input.rightButton?.valueChangedHandler = { [weak self] _, _, down in
+                DispatchQueue.main.async { self?.setMouseButton(2, down: down) }
+            }
+            input.middleButton?.valueChangedHandler = { [weak self] _, _, down in
+                DispatchQueue.main.async { self?.setMouseButton(4, down: down) }
+            }
+        }
+
+        @objc private func toggleMouseCapture() {
+            setMouseCapture(!mouseCaptured)
+        }
+
+        private func setMouseCapture(_ captured: Bool) {
+            guard mouseDevice != nil else { return }
+            mouseCaptured = captured
+            if captured, let input = mouseDevice?.mouseInput {
+                mouseButtons = (input.leftButton.isPressed ? 1 : 0)
+                    | (input.rightButton?.isPressed == true ? 2 : 0)
+                    | (input.middleButton?.isPressed == true ? 4 : 0)
+                bridge.mouse(dx: 0, dy: 0, buttons: mouseButtons)
+            } else {
+                mouseButtons = 0
+                bridge.mouse(dx: 0, dy: 0, buttons: 0)
+            }
+            var style = captureButton.configuration ?? .filled()
+            style.title = captured ? "Release mouse" : "Capture mouse"
+            captureButton.configuration = style
+            AppLog.write("display: relative mouse \(captured ? "captured" : "released")")
+        }
+
+        private func setMouseButton(_ bit: UInt32, down: Bool) {
+            if down { mouseButtons |= bit } else { mouseButtons &= ~bit }
+            if mouseCaptured {
+                bridge.mouse(dx: 0, dy: 0, buttons: mouseButtons)
             }
         }
 
@@ -536,6 +637,7 @@ struct DisplayView: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            if window == nil && mouseCaptured { setMouseCapture(false) }
             takeHardwareKeys()
         }
 

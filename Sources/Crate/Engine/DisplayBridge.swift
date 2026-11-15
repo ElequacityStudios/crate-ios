@@ -313,6 +313,14 @@ final class DisplayBridge: @unchecked Sendable {
         lock.withLock { lastPointer }
     }
 
+    /// Raw relative mouse movement in guest pixels, with left/right/middle button bits.
+    func mouse(dx: Int32, dy: Int32, buttons: UInt32) {
+        lock.withLock {
+            guard let machine else { return }
+            crate_input_mouse(machine, dx, dy, buttons)
+        }
+    }
+
     func scroll(dx: Int32, dy: Int32) {
         lock.withLock {
             guard let machine else { return }

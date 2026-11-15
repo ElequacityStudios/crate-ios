@@ -33,6 +33,13 @@ jobs:
               echo "tag $GITHUB_REF_NAME, but project.yml says $versions" >&2; exit 1; }
       - run: sudo xcode-select -s /Applications/Xcode_27.1.app
       - run: brew install xcodegen
+      - name: Check out the forked Crate engine
+        uses: actions/checkout@v4
+        with:
+          repository: ElequacityStudios/crate
+          ref: main
+          path: crate
+      - uses: dtolnay/rust-toolchain@stable
       - name: Frameworks
         env:
           # For gh, checking each pinned release's attestation.
@@ -41,7 +48,7 @@ jobs:
         run: |
           Scripts/fetch-frameworks.sh
           Scripts/fetch-stikjit.sh
-          Scripts/fetch-crate.sh
+          CRATE_DIR="$GITHUB_WORKSPACE/crate" Scripts/build-crate.sh
       - name: Build
         run: |
           Scripts/build-ipa.sh "$RUNNER_TEMP/out/crate-unsigned.ipa"
