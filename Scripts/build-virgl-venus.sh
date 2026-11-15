@@ -26,7 +26,7 @@ SRC="$DEPS/src"
 WORK="$DEPS/virgl-venus-build"
 DEST="$REPO/Frameworks/GPU"
 HEADERS="$DEPS/angle-include"
-STAMP="UTM virglrenderer $UTM_COMMIT + upstream $UPSTREAM_COMMIT + steamac $STEAMAC_COMMIT; Venus; libepoxy $EPOXY_VERSION; iOS $MIN_IOS"
+STAMP="UTM virglrenderer $UTM_COMMIT + upstream $UPSTREAM_COMMIT + steamac $STEAMAC_COMMIT; Venus; MoltenVK framework loader; libepoxy $EPOXY_VERSION; iOS $MIN_IOS"
 
 if [ "$(cat "$DEST/virglrenderer.venus.version" 2>/dev/null)" = "$STAMP" ] \
     && [ -d "$DEST/virglrenderer.venus.framework" ] && [ -d "$DEST/epoxy.framework" ]; then
@@ -100,6 +100,11 @@ for patch in "$STEAMAC_DIR"/host/virglrenderer/patches/*.patch; do
     echo "==> applying $(basename "$patch")"
     git -C "$WORK/virglrenderer" apply --whitespace=nowarn "$patch"
 done
+
+# Venus's loader normally asks dyld for libMoltenVK.dylib, while the iOS app
+# embeds MoltenVK as a framework. Teach it the framework's actual @rpath path.
+git -C "$WORK/virglrenderer" apply --whitespace=nowarn \
+    "$REPO/Scripts/patches/virglrenderer-moltenvk-framework-loader.patch"
 
 # The Venus protocol generator needs Mako; Gallium's generators need PyYAML.
 python3 -m venv "$WORK/venv"

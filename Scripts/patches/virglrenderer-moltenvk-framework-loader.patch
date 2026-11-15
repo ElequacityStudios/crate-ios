@@ -1,0 +1,19 @@
+diff --git a/src/venus/vkr_library.c b/src/venus/vkr_library.c
+--- a/src/venus/vkr_library.c
++++ b/src/venus/vkr_library.c
+@@ -45,6 +45,12 @@
+ #ifdef __APPLE__
+    lib->handle = dlopen("libvulkan.dylib", RTLD_NOW | RTLD_LOCAL);
+    if (lib->handle == NULL)
+       lib->handle = dlopen("libvulkan.1.dylib", RTLD_NOW | RTLD_LOCAL);
+    if (lib->handle == NULL)
+       lib->handle = dlopen("libMoltenVK.dylib", RTLD_NOW | RTLD_LOCAL);
++   if (lib->handle == NULL)
++      lib->handle = dlopen("@rpath/MoltenVK.framework/MoltenVK", RTLD_NOW | RTLD_LOCAL);
++   if (lib->handle == NULL)
++      lib->handle = dlopen("@loader_path/../MoltenVK.framework/MoltenVK",
++                           RTLD_NOW | RTLD_LOCAL);
++   if (lib->handle == NULL)
++      lib->handle = dlopen("@executable_path/Frameworks/MoltenVK.framework/MoltenVK",
++                           RTLD_NOW | RTLD_LOCAL);
+ #else
