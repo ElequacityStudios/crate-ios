@@ -43,6 +43,7 @@ if ! grep -Fq 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs
     || ! grep -Fq '(!self.context_init_enabled || !request.fenced())' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
     || ! grep -Fq 'has_fences = !self.fenced.is_empty() || !self.context_fenced.is_empty()' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
     || ! grep -Fq 'memory_kind == 1 && count == 0' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq '(total as u64) < size' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
     || ! grep -Fq 'source_end > *size' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
     || ! grep -Fq 'self.blob_backings.remove(&resource)' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
     || ! grep -Fq 'venus_context_init_and_timeline_fences_are_forwarded' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
