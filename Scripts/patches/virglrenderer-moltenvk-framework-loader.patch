@@ -1,7 +1,7 @@
 diff --git a/src/venus/vkr_library.c b/src/venus/vkr_library.c
 --- a/src/venus/vkr_library.c
 +++ b/src/venus/vkr_library.c
-@@ -45,6 +45,12 @@
+@@ -45,7 +45,13 @@
  #ifdef __APPLE__
     lib->handle = dlopen("libvulkan.dylib", RTLD_NOW | RTLD_LOCAL);
     if (lib->handle == NULL)
