@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import SwiftUI
+import UIKit
 
 /// A VM, full screen. With JIT on it boots in crate and shows either its screen
 /// or its console, a terminal on the serial port, with a switch between them
@@ -90,6 +91,11 @@ struct MachineScreen: View {
             JITSetupView()
                 .environment(jit)
                 .preferredColorScheme(nil)
+        }
+        .background {
+            MousePointerLockPresenter(isCaptured: $mouseCaptured)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
         }
     }
 
@@ -518,5 +524,137 @@ private struct TitleUnlessBarsVertical: ViewModifier {
         content
             .navigationTitle(title)
             .toolbar(removing: verticalEdge == nil ? nil : .title)
+    }
+}
+
+/// Presents a transparent full-screen controller while the VM owns the mouse.
+/// Its UIKit pointer-lock preference confines the system pointer to this scene;
+/// the view also shields the rest of the app from accidental mouse clicks.
+@MainActor
+private struct MousePointerLockPresenter: UIViewControllerRepresentable {
+    @Binding var isCaptured: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isCaptured: $isCaptured)
+    }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        controller.view.isUserInteractionEnabled = false
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        context.coordinator.update(
+            isCaptured: isCaptured,
+            binding: $isCaptured,
+            presenter: controller
+        )
+    }
+
+    static func dismantleUIViewController(_ controller: UIViewController, coordinator: Coordinator) {
+        coordinator.dismiss()
+    }
+
+    @MainActor
+    final class Coordinator {
+        private var isCaptured: Binding<Bool>
+        private var overlay: PointerLockOverlayController?
+
+        init(isCaptured: Binding<Bool>) {
+            self.isCaptured = isCaptured
+        }
+
+        func update(isCaptured: Bool, binding: Binding<Bool>, presenter: UIViewController) {
+            self.isCaptured = binding
+            if isCaptured {
+                guard overlay == nil, presenter.viewIfLoaded?.window != nil else { return }
+                let controller = PointerLockOverlayController()
+                controller.onRelease = { [weak self] in
+                    self?.isCaptured.wrappedValue = false
+                }
+                controller.modalPresentationStyle = .overFullScreen
+                controller.modalTransitionStyle = .crossDissolve
+                controller.isModalInPresentation = true
+                overlay = controller
+                presenter.present(controller, animated: false)
+            } else {
+                dismiss()
+            }
+        }
+
+        func dismiss() {
+            guard let overlay else { return }
+            overlay.dismiss(animated: false)
+            self.overlay = nil
+        }
+    }
+}
+
+@MainActor
+private final class PointerLockOverlayController: UIViewController, UIPointerInteractionDelegate {
+    var onRelease: (() -> Void)?
+
+    override var prefersPointerLocked: Bool { true }
+    override var canBecomeFirstResponder: Bool { true }
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
+    override var prefersHomeIndicatorAutoHidden: Bool { true }
+
+    override var keyCommands: [UIKeyCommand]? {
+        [
+            UIKeyCommand(
+                input: UIKeyCommand.inputEscape,
+                modifierFlags: [],
+                action: #selector(releaseCapture)
+            )
+        ]
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isOpaque = false
+        view.accessibilityViewIsModal = true
+        view.addInteraction(UIPointerInteraction(delegate: self))
+
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = "Release mouse"
+        configuration.image = UIImage(systemName: "cursorarrow")
+        configuration.imagePadding = 8
+        configuration.baseBackgroundColor = UIColor.systemBlue.withAlphaComponent(0.95)
+        configuration.baseForegroundColor = .white
+        let button = UIButton(configuration: configuration)
+        button.accessibilityHint = "Release the virtual machine's mouse capture."
+        button.addTarget(self, action: #selector(releaseCapture), for: .touchUpInside)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(button)
+        NSLayoutConstraint.activate([
+            button.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            button.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+        ])
+    }
+
+    func pointerInteraction(
+        _ interaction: UIPointerInteraction,
+        regionFor request: UIPointerRegionRequest,
+        defaultRegion: UIPointerRegion
+    ) -> UIPointerRegion? {
+        defaultRegion
+    }
+
+    func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
+        .hidden()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        becomeFirstResponder()
+        setNeedsUpdateOfPrefersPointerLocked()
+    }
+
+    @objc private func releaseCapture() {
+        onRelease?()
     }
 }

@@ -26,20 +26,33 @@ grep -q "module CrateEngine" "$CRATE_DIR/tools/xcframework.sh" || {
     exit 1
 }
 
-# Do not ship an IPA with blob support but without the complete Venus protocol:
-# the engine must advertise capset 4 and VIRTIO_GPU_F_CONTEXT_INIT, and route
-# context creation through virglrenderer_context_create_with_flags.
-if ! grep -q 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'F_CONTEXT_INIT: u64 = 1 << 4' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
-    || ! grep -q 'virgl_renderer_context_create_with_flags' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'virgl_renderer_context_create_fence' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'write_context_fence: Some(write_context_fence)' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'VIRGL_RENDERER_VENUS: c_int = 1 << 6' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'VIRGL_RENDERER_RENDER_SERVER: c_int = 1 << 9' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'VIRGL_RENDERER_USE_GLES | VIRGL_RENDERER_VENUS | VIRGL_RENDERER_RENDER_SERVER' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
-    || ! grep -q 'context_fenced: VecDeque<FencedContext>' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
-    || ! grep -q 'venus_context_init_and_timeline_fences_are_forwarded' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs"; then
-    echo "crate checkout lacks complete virtio-gpu Venus context initialization and timeline fences" >&2
+# Fail the IPA build unless the engine contains the complete, gated Venus
+# protocol and the iOS relative-mouse capture fixes.
+if ! grep -Fq 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'F_CONTEXT_INIT: u64 = 1 << 4' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'virgl_renderer_context_create_with_flags' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'virgl_renderer_context_create_fence' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'write_context_fence: Some(write_context_fence)' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'VIRGL_RENDERER_VENUS: c_int = 1 << 6' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'VIRGL_RENDERER_RENDER_SERVER: c_int = 1 << 9' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'let venus_enabled = virgl_library.name.contains("virglrenderer.venus")' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'renderer_flags |= VIRGL_RENDERER_VENUS | VIRGL_RENDERER_RENDER_SERVER' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'capsets.retain(|capset| capset.id != CAPSET_VENUS)' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'context_fenced: VecDeque<FencedContext>' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'context_init_enabled = activation.features & F_CONTEXT_INIT != 0' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq '(!self.context_init_enabled || !request.fenced())' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'has_fences = !self.fenced.is_empty() || !self.context_fenced.is_empty()' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'memory_kind == 1 && count == 0' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'source_end > *size' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/mod.rs" \
+    || ! grep -Fq 'self.blob_backings.remove(&resource)' "$CRATE_DIR/crates/crate-host/src/virgl.rs" \
+    || ! grep -Fq 'venus_context_init_and_timeline_fences_are_forwarded' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
+    || ! grep -Fq 'venus_capset_does_not_force_context_init_without_feature_negotiation' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
+    || ! grep -Fq 'venus_host_blob_maps_and_scans_out' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
+    || ! grep -Fq 'venus_default_blob_can_attach_and_detach_backing_later' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
+    || ! grep -Fq 'override var prefersPointerLocked: Bool { true }' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
+    || ! grep -Fq 'dy: Int32(dy.rounded())' "$REPO/Sources/Crate/Engine/DisplayView.swift" \
+    || ! grep -Fq 'captureButton.isHidden = captured' "$REPO/Sources/Crate/Engine/DisplayView.swift"; then
+    echo "engine checkout lacks the complete Venus/blob protocol or the iOS mouse-capture fixes" >&2
     exit 1
 fi
 VERSION="$(git -C "$CRATE_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"

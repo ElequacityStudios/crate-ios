@@ -49,6 +49,9 @@ struct DisplayView: UIViewRepresentable {
 
     func updateUIView(_ view: ScreenView, context: Context) {
         view.openRegion = openRegion
+        // A release from the full-screen pointer-lock shield updates this
+        // binding rather than the button inside ScreenView.
+        if !mouseCaptured { view.releaseMouseCapture() }
         if showsKeyboard, !view.isFirstResponder {
             view.becomeFirstResponder()
         } else if !showsKeyboard {
@@ -155,7 +158,7 @@ struct DisplayView: UIViewRepresentable {
             captureStyle.baseForegroundColor = .white
             captureStyle.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
             captureButton.configuration = captureStyle
-            captureButton.accessibilityHint = "Send raw mouse movement to the virtual machine. iOS may still move its system pointer outside the app; tap Release mouse to stop capture."
+            captureButton.accessibilityHint = "Requests system pointer lock and sends raw movement to the virtual machine. Press Escape or touch Release mouse to stop capture."
             captureButton.addTarget(self, action: #selector(toggleMouseCapture), for: .touchUpInside)
             captureButton.translatesAutoresizingMaskIntoConstraints = false
             captureButton.isHidden = true
@@ -572,7 +575,7 @@ struct DisplayView: UIViewRepresentable {
             input.mouseMovedHandler = { [weak self] _, dx, dy in
                 DispatchQueue.main.async {
                     guard let self, self.mouseCaptured else { return }
-                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: -Int32(dy.rounded()),
+                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: Int32(dy.rounded()),
                                       buttons: self.mouseButtons)
                 }
             }
@@ -600,18 +603,14 @@ struct DisplayView: UIViewRepresentable {
             mouseCaptured = captured
             onMouseCaptureChanged?(captured)
             pointerInteraction.invalidate()
-            if captured, let input = mouseDevice?.mouseInput {
-                mouseButtons = (input.leftButton.isPressed ? 1 : 0)
-                    | (input.rightButton?.isPressed == true ? 2 : 0)
-                    | (input.middleButton?.isPressed == true ? 4 : 0)
-                bridge.mouse(dx: 0, dy: 0, buttons: mouseButtons)
-            } else {
-                mouseButtons = 0
-                bridge.mouse(dx: 0, dy: 0, buttons: 0)
-            }
+            // Do not forward the button press that initiated capture; only
+            // subsequent physical button events belong to the guest.
+            mouseButtons = 0
+            bridge.mouse(dx: 0, dy: 0, buttons: 0)
             var style = captureButton.configuration ?? .filled()
             style.title = captured ? "Release mouse" : "Capture mouse"
             captureButton.configuration = style
+            captureButton.isHidden = captured
             AppLog.write("display: relative mouse \(captured ? "captured" : "released")")
         }
 
