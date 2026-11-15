@@ -26,7 +26,7 @@ SRC="$DEPS/src"
 WORK="$DEPS/virgl-venus-build"
 DEST="$REPO/Frameworks/GPU"
 HEADERS="$DEPS/angle-include"
-STAMP="UTM virglrenderer $UTM_COMMIT + upstream $UPSTREAM_COMMIT + steamac $STEAMAC_COMMIT; Venus; MoltenVK framework loader; libepoxy $EPOXY_VERSION; iOS $MIN_IOS"
+STAMP="UTM virglrenderer $UTM_COMMIT + upstream $UPSTREAM_COMMIT + steamac $STEAMAC_COMMIT; Venus capset 4; MoltenVK framework loader; libepoxy $EPOXY_VERSION; iOS $MIN_IOS"
 
 if [ "$(cat "$DEST/virglrenderer.venus.version" 2>/dev/null)" = "$STAMP" ] \
     && [ -d "$DEST/virglrenderer.venus.framework" ] && [ -d "$DEST/epoxy.framework" ]; then
