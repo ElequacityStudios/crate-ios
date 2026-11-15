@@ -65,6 +65,8 @@ final class ConsoleBridge: @unchecked Sendable {
             logPending.removeAll()
             logged = 0
         }
+        // Logging off (Settings > Logs) keeps no file of the console.
+        guard AppLog.isOn else { return }
         logQueue.async { try? Data().write(to: Self.logURL) }
     }
 
@@ -130,7 +132,7 @@ final class ConsoleBridge: @unchecked Sendable {
         lock.withLock {
             shown.append(contentsOf: bytes)
             if shown.count > Self.keep { shown.removeFirst(shown.count - Self.keep) }
-            if logged < Self.keep {
+            if logged < Self.keep, AppLog.isOn {
                 logPending.append(contentsOf: bytes)
                 logged += bytes.count
                 if !logScheduled {

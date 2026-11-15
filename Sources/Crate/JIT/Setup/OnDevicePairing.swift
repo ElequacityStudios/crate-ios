@@ -160,10 +160,15 @@ final class OnDevicePairing: NSObject, @unchecked Sendable {
         return record.isEmpty ? .failed("Pairing finished without a pairing record.") : .paired(record)
     }
 
+    /// Where idevice logs each pairing message.
+    static let logURL = URL.cachesDirectory.appendingPathComponent("idevice.log")
+
     /// idevice's own log of each pairing message, at Library/Caches/idevice.log,
-    /// started once per launch (its logger can't be started twice).
+    /// started once per launch (its logger can't be started twice), and not
+    /// while logging is off (Settings > Logs).
     private static let ideviceLog: Void = {
-        let path = URL.cachesDirectory.appendingPathComponent("idevice.log").path
+        guard AppLog.isOn else { return }
+        let path = logURL.path
         _ = path.withCString { idevice_init_logger(Disabled, Debug, UnsafeMutablePointer(mutating: $0)) }
     }()
 

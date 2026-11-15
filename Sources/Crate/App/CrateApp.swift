@@ -17,6 +17,7 @@ struct CrateApp: App {
 
     init() {
         AppLog.begin()
+        MemoryLog.watchWarnings()
         let memory = MemoryReport()
         AppLog.write("memory: physical \(memory.physical), limit \(memory.limit.map(String.init) ?? "n/a"), "
                      + "available \(memory.available.map(String.init) ?? "n/a"), footprint \(memory.footprint) bytes")

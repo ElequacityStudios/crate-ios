@@ -33,6 +33,8 @@ final class MachineRunner {
     let console = ConsoleBridge()
     let display = DisplayBridge()
     private var machine: OpaquePointer?
+    /// crate's memory in the log while the VM runs.
+    private let memoryLog = MemoryLog()
     #if DEBUG
     private let debugHooks = DebugHooks()
     #endif
@@ -100,6 +102,7 @@ final class MachineRunner {
                     if crate_machine_start(made) == CRATE_OK {
                         AppLog.write(String(format: "vm: running, created in %.2f s", Date.now.timeIntervalSince(started)))
                         self.phase = .running
+                        self.memoryLog.start()
                         #if DEBUG
                         self.debugHooks.start(console: console, display: display)
                         #endif
@@ -276,6 +279,7 @@ final class MachineRunner {
         default: text = "The VM stopped: \(error ?? "crate gave no reason")."
         }
         AppLog.write("vm: \(text)")
+        memoryLog.stop()
         #if DEBUG
         debugHooks.stop()
         #endif

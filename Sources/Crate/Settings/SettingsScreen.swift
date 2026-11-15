@@ -11,6 +11,8 @@ struct SettingsScreen: View {
     @AppStorage(SettingsKey.jitMethod) private var jitMethod = JITMethod.standard.rawValue
     @AppStorage(SettingsKey.jitAtLaunch) private var jitAtLaunch = true
     @AppStorage(SettingsKey.codeRegionMB) private var codeRegionMB = CodeRegion.standard
+    @AppStorage(SettingsKey.logsEnabled) private var logsEnabled = true
+    @AppStorage(SettingsKey.logsTrackMemory) private var trackMemory = true
 
     @State private var memory = MemoryReport()
     @State private var logURL: URL?
@@ -26,7 +28,7 @@ struct SettingsScreen: View {
             }
             .navigationTitle("Settings")
             .task { await refreshMemory() }
-            .onAppear { logURL = LogExport.prepare() }
+            .onAppear { logURL = logsEnabled ? LogExport.prepare() : nil }
         }
     }
 
@@ -168,6 +170,13 @@ struct SettingsScreen: View {
 
     private var logsSection: some View {
         Section {
+            Toggle("Collect Logs", isOn: $logsEnabled)
+                .onChange(of: logsEnabled) { _, on in
+                    AppLog.setEnabled(on)
+                    logURL = on ? LogExport.prepare() : nil
+                }
+            Toggle("Track Memory Use", isOn: $trackMemory)
+                .disabled(!logsEnabled)
             if let logURL {
                 ShareLink(item: logURL) {
                     Label("Export Logs", systemImage: "square.and.arrow.up")
@@ -176,8 +185,21 @@ struct SettingsScreen: View {
         } header: {
             Text("Logs")
         } footer: {
-            Text("Shares a file with what crate and the VM engine logged this launch, for a bug report.")
+            Text(logsFooter)
         }
+    }
+
+    private var logsFooter: String {
+        guard logsEnabled else {
+            return "crate isn't logging, and has deleted its logs."
+        }
+        var text = "crate logs what it and the VM engine do, this launch and the last, so "
+            + "Export Logs can share them for a bug report."
+        if trackMemory {
+            text += " Track Memory Use adds crate's memory use every \(MemoryLog.interval) seconds "
+                + "while a VM runs, about 40 KB an hour, so the log shows if iOS closed crate for using too much."
+        }
+        return text
     }
 
     // MARK: - About

@@ -29,6 +29,10 @@ enum SettingsKey {
     static let codeRegionMB = "jit.codeRegionMB"
     static let installMemoryGB = "install.memoryGB"
     static let installDiskGB = "install.diskGB"
+    /// Settings > Logs: whether crate logs at all, and whether it logs its
+    /// memory while a VM runs. Both on unless turned off.
+    static let logsEnabled = "logs.enabled"
+    static let logsTrackMemory = "logs.trackMemory"
 
     /// Debug builds: pretend JIT is on (see `JITSession.previewOn`).
     static let previewJIT = "preview.jitOn"
