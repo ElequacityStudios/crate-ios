@@ -83,6 +83,8 @@ struct DisplayView: UIViewRepresentable {
         private var mouse: CGPoint?
         /// What only a mouse or trackpad drives, never a touch.
         private var pointerOnly: [UIGestureRecognizer] = []
+        /// Scroll events remain available while the mouse owns relative motion.
+        private var capturedScrollGestures: [UIGestureRecognizer] = []
         /// What a mouse's primary button drives as a finger does, but its
         /// others don't: they click as themselves (rightClicked).
         private var primaryOnly: [UIGestureRecognizer] = []
@@ -200,6 +202,7 @@ struct DisplayView: UIViewRepresentable {
             rightClick.require(toFail: tap)
             middleClick.require(toFail: tap)
             pointerOnly = [wheel, glide, hover]
+            capturedScrollGestures = [wheel, glide]
             primaryOnly = [drag, hold]
             fingerGestures = [tap, drag, hold, scroll]
             twoFingerTap.addTarget(self, action: #selector(twoFingerTapped))
@@ -522,7 +525,9 @@ struct DisplayView: UIViewRepresentable {
             // don't let UIKit hover/button gestures turn into guest clicks,
             // and don't let a finger accidentally drive the tablet meanwhile.
             // The release button is a subview and continues to receive taps.
-            if mouseCaptured { return false }
+            if mouseCaptured {
+                return capturedScrollGestures.contains(recognizer)
+            }
             return !primaryOnly.contains(recognizer) || event.buttonMask.isSubset(of: .primary)
         }
 
@@ -611,6 +616,7 @@ struct DisplayView: UIViewRepresentable {
             style.title = captured ? "Release mouse" : "Capture mouse"
             captureButton.configuration = style
             captureButton.isHidden = captured
+            if captured { takeHardwareKeys() }
             AppLog.write("display: relative mouse \(captured ? "captured" : "released")")
         }
 
@@ -627,11 +633,9 @@ struct DisplayView: UIViewRepresentable {
         /// one; over the bars beside it, as anywhere else.
         func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest,
                                 defaultRegion: UIPointerRegion) -> UIPointerRegion? {
-            // UTM's pointer-lock path withdraws the pointer region entirely
-            // while locked. The system owns the pointer then, not UIKit's
-            // hover-region machinery.
-            guard !mouseCaptured else { return nil }
-            let rect = pointerArea
+            // Keep a hidden-style region over the whole view while captured:
+            // withdrawing it makes UIKit fall back to its visible system cursor.
+            let rect = mouseCaptured ? bounds : pointerArea
             return rect.contains(request.location) ? UIPointerRegion(rect: rect) : nil
         }
 
@@ -735,6 +739,9 @@ struct DisplayView: UIViewRepresentable {
             for press in presses {
                 guard let key = press.key, let code = LinuxKeys.code(for: key.keyCode) else { continue }
                 let isModifier = LinuxKeys.modifiers.contains(code)
+                if down, mouseCaptured, key.charactersIgnoringModifiers == UIKeyCommand.inputEscape {
+                    releaseMouseCapture()
+                }
                 if down, !isModifier {
                     latchedForPress = keyBar.takeModifiers()
                     for modifier in latchedForPress { bridge.key(modifier, down: true) }

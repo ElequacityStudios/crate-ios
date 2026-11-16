@@ -558,19 +558,6 @@ private final class PointerLockOverlayController: UIViewController {
         isCaptured ? .all : []
     }
     override var prefersHomeIndicatorAutoHidden: Bool { isCaptured }
-    override var canBecomeFirstResponder: Bool { isCaptured }
-
-    override var keyCommands: [UIKeyCommand]? {
-        guard isCaptured else { return nil }
-        return [
-            UIKeyCommand(
-                input: UIKeyCommand.inputEscape,
-                modifierFlags: [],
-                action: #selector(releaseCapture)
-            )
-        ]
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
@@ -613,11 +600,6 @@ private final class PointerLockOverlayController: UIViewController {
         if #available(iOS 26.0, *) {
             setNeedsUpdateOfPrefersPointerLocked()
         }
-        if captured {
-            becomeFirstResponder()
-        } else {
-            resignFirstResponder()
-        }
     }
 
     override func didMove(toParent parent: UIViewController?) {
@@ -628,7 +610,6 @@ private final class PointerLockOverlayController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         updateParentPreferences()
-        if isCaptured { becomeFirstResponder() }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
