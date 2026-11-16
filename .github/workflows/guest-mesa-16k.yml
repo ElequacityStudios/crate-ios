@@ -70,7 +70,7 @@ jobs:
           install -m755 stage/usr/lib/libvulkan_virtio.so package/usr/lib/
           install -m644 stage/usr/share/vulkan/icd.d/virtio_icd.json package/usr/share/vulkan/icd.d/
           install -m644 mesa-26.2.7/docs/license.rst package/usr/share/licenses/vulkan-virtio/LICENSE
-          cat > package/.PKGINFO <<'EOF'
+          cat > package/.PKGINFO <<EOF
           pkgname = vulkan-virtio
           pkgbase = vulkan-virtio
           pkgver = 1:26.2.7-2
