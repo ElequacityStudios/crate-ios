@@ -92,10 +92,9 @@ struct MachineScreen: View {
                 .environment(jit)
                 .preferredColorScheme(nil)
         }
-        .background {
+        .overlay {
             MousePointerLockPresenter(isCaptured: $mouseCaptured)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
         }
     }
 
@@ -527,82 +526,43 @@ private struct TitleUnlessBarsVertical: ViewModifier {
     }
 }
 
-/// Presents a transparent full-screen controller while the VM owns the mouse.
-/// Its UIKit pointer-lock preference confines the system pointer to this scene;
-/// the view also shields the rest of the app from accidental mouse clicks.
+/// Gives SwiftUI's hosting controller the same pointer-lock child that
+/// UTM installs for its VM display controller.
 @MainActor
 private struct MousePointerLockPresenter: UIViewControllerRepresentable {
     @Binding var isCaptured: Bool
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(isCaptured: $isCaptured)
+    func makeUIViewController(context: Context) -> PointerLockOverlayController {
+        _ = CrateUIKitPatches.install
+        return PointerLockOverlayController()
     }
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        let controller = UIViewController()
-        controller.view.backgroundColor = .clear
-        controller.view.isUserInteractionEnabled = false
-        return controller
+    func updateUIViewController(_ controller: PointerLockOverlayController, context: Context) {
+        controller.onRelease = { isCaptured = false }
+        controller.setCaptured(isCaptured)
     }
 
-    func updateUIViewController(_ controller: UIViewController, context: Context) {
-        context.coordinator.update(
-            isCaptured: isCaptured,
-            binding: $isCaptured,
-            presenter: controller
-        )
-    }
-
-    static func dismantleUIViewController(_ controller: UIViewController, coordinator: Coordinator) {
-        coordinator.dismiss()
-    }
-
-    @MainActor
-    final class Coordinator {
-        private var isCaptured: Binding<Bool>
-        private var overlay: PointerLockOverlayController?
-
-        init(isCaptured: Binding<Bool>) {
-            self.isCaptured = isCaptured
-        }
-
-        func update(isCaptured: Bool, binding: Binding<Bool>, presenter: UIViewController) {
-            self.isCaptured = binding
-            if isCaptured {
-                guard overlay == nil, presenter.viewIfLoaded?.window != nil else { return }
-                let controller = PointerLockOverlayController()
-                controller.onRelease = { [weak self] in
-                    self?.isCaptured.wrappedValue = false
-                }
-                controller.modalPresentationStyle = .overFullScreen
-                controller.modalTransitionStyle = .crossDissolve
-                controller.isModalInPresentation = true
-                overlay = controller
-                presenter.present(controller, animated: false)
-            } else {
-                dismiss()
-            }
-        }
-
-        func dismiss() {
-            guard let overlay else { return }
-            overlay.dismiss(animated: false)
-            self.overlay = nil
-        }
+    static func dismantleUIViewController(_ controller: PointerLockOverlayController, coordinator: ()) {
+        controller.setCaptured(false)
     }
 }
 
 @MainActor
-private final class PointerLockOverlayController: UIViewController, UIPointerInteractionDelegate {
+private final class PointerLockOverlayController: UIViewController {
     var onRelease: (() -> Void)?
+    private(set) var isCaptured = false
+    private let releaseButton = UIButton(type: .system)
 
-    override var prefersPointerLocked: Bool { true }
-    override var canBecomeFirstResponder: Bool { true }
-    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
+    override var prefersPointerLocked: Bool { isCaptured }
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+        isCaptured ? .all : []
+    }
+    override var prefersHomeIndicatorAutoHidden: Bool { isCaptured }
+    override var canBecomeFirstResponder: Bool { isCaptured }
 
     override var keyCommands: [UIKeyCommand]? {
-        [
+        guard isCaptured else { return nil }
+        return [
             UIKeyCommand(
                 input: UIKeyCommand.inputEscape,
                 modifierFlags: [],
@@ -615,8 +575,8 @@ private final class PointerLockOverlayController: UIViewController, UIPointerInt
         super.viewDidLoad()
         view.backgroundColor = .clear
         view.isOpaque = false
-        view.accessibilityViewIsModal = true
-        view.addInteraction(UIPointerInteraction(delegate: self))
+        view.isUserInteractionEnabled = false
+        view.accessibilityViewIsModal = false
 
         var configuration = UIButton.Configuration.filled()
         configuration.title = "Release mouse"
@@ -624,34 +584,61 @@ private final class PointerLockOverlayController: UIViewController, UIPointerInt
         configuration.imagePadding = 8
         configuration.baseBackgroundColor = UIColor.systemBlue.withAlphaComponent(0.95)
         configuration.baseForegroundColor = .white
-        let button = UIButton(configuration: configuration)
-        button.accessibilityHint = "Release the virtual machine's mouse capture."
-        button.addTarget(self, action: #selector(releaseCapture), for: .touchUpInside)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(button)
+        releaseButton.configuration = configuration
+        releaseButton.accessibilityHint = "Release the virtual machine's mouse capture."
+        releaseButton.addTarget(self, action: #selector(releaseCapture), for: .touchUpInside)
+        releaseButton.translatesAutoresizingMaskIntoConstraints = false
+        releaseButton.isHidden = true
+        view.addSubview(releaseButton)
         NSLayoutConstraint.activate([
-            button.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            button.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
-            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+            releaseButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            releaseButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            releaseButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
         ])
     }
 
-    func pointerInteraction(
-        _ interaction: UIPointerInteraction,
-        regionFor request: UIPointerRegionRequest,
-        defaultRegion: UIPointerRegion
-    ) -> UIPointerRegion? {
-        defaultRegion
+    func setCaptured(_ captured: Bool) {
+        guard isCaptured != captured else {
+            updateParentPreferences()
+            return
+        }
+        isCaptured = captured
+        view.isUserInteractionEnabled = captured
+        view.accessibilityViewIsModal = captured
+        releaseButton.isHidden = !captured
+        updateParentPreferences()
+
+        setNeedsUpdateOfHomeIndicatorAutoHidden()
+        setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+        if #available(iOS 26.0, *) {
+            setNeedsUpdateOfPrefersPointerLocked()
+        }
+        if captured {
+            becomeFirstResponder()
+        } else {
+            resignFirstResponder()
+        }
     }
 
-    func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
-        .hidden()
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        updateParentPreferences()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        becomeFirstResponder()
-        setNeedsUpdateOfPrefersPointerLocked()
+        updateParentPreferences()
+        if isCaptured { becomeFirstResponder() }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        if isCaptured { onRelease?() }
+    }
+
+    private func updateParentPreferences() {
+        parent?.crate_setPointerLockPreferencesChild(isCaptured ? self : nil)
+        viewIfLoaded?.window?.crate_ignoresIndirectPointerTouches = isCaptured
     }
 
     @objc private func releaseCapture() {
