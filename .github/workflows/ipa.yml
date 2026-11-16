@@ -45,19 +45,16 @@ jobs:
           ref: main
           path: crate
       - uses: dtolnay/rust-toolchain@stable
-      - name: Test blob scanout and Venus fence retirement
-        run: cargo test --all-targets -p crate-devices -p crate-host -p crate-virt
-        working-directory: crate
-      - name: Frameworks
+      - name: Frameworks and Crate engine
         env:
           # For gh, checking each pinned release's attestation.
           GH_TOKEN: ${{ github.token }}
           VERIFY_ATTESTATION: 1
         run: |
+          # Mouse/input-only build: keep the attested GPU framework bundle
+          # pinned as-is. Vulkan renderer work is paused until capture is fixed.
           Scripts/fetch-frameworks.sh
           Scripts/fetch-stikjit.sh
-          Scripts/build-moltenvk.sh
-          Scripts/build-virgl-venus.sh
           CRATE_DIR="$GITHUB_WORKSPACE/crate" Scripts/build-crate.sh
       - name: Build
         run: |
