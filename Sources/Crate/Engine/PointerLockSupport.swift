@@ -63,7 +63,7 @@ extension UIViewController {
         objc_getAssociatedObject(self, &crateHomeIndicatorChildKey) as? UIViewController
     }
 
-    @objc fileprivate dynamic var crate_childViewControllerForScreenEdgesDeferringSystemGestures: UIViewController? {
+    @objc fileprivate dynamic var crate_childForScreenEdgesDeferringSystemGestures: UIViewController? {
         objc_getAssociatedObject(self, &crateSystemGesturesChildKey) as? UIViewController
     }
 
