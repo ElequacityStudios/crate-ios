@@ -50,9 +50,13 @@ if ! grep -Fq 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs
     || ! grep -Fq 'venus_capset_does_not_force_context_init_without_feature_negotiation' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
     || ! grep -Fq 'venus_host_blob_maps_and_scans_out' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
     || ! grep -Fq 'venus_default_blob_can_attach_and_detach_backing_later' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
-    || ! grep -Fq 'override var prefersPointerLocked: Bool { true }' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
-    || ! grep -Fq 'dy: Int32(dy.rounded())' "$REPO/Sources/Crate/Engine/DisplayView.swift" \
-    || ! grep -Fq 'captureButton.isHidden = captured' "$REPO/Sources/Crate/Engine/DisplayView.swift"; then
+    || ! grep -Fq 'override var prefersPointerLocked: Bool { isCaptured }' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
+    || ! grep -Fq 'override var prefersDirectTouchSystemGesturesDisabled: Bool { isCaptured }' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
+    || ! grep -Fq 'dy: Int32((-dy).rounded())' "$REPO/Sources/Crate/Engine/DisplayView.swift" \
+    || ! grep -Fq 'guard !mouseCaptured else { return nil }' "$REPO/Sources/Crate/Engine/DisplayView.swift" \
+    || ! grep -Fq 'releaseButton.isHidden = !captured' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
+    || ! grep -Fq 'crate_childForScreenEdgesDeferringSystemGestures' "$REPO/Sources/Crate/Engine/PointerLockSupport.swift" \
+    || ! grep -Fq 'touch.type == .indirectPointer' "$REPO/Sources/Crate/Engine/PointerLockSupport.swift"; then
     echo "engine checkout lacks the complete Venus/blob protocol or the iOS mouse-capture fixes" >&2
     exit 1
 fi
