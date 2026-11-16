@@ -22,8 +22,8 @@ enum CrateUIKitPatches {
             on: UIViewController.self
         )
         exchange(
-            #selector(getter: UIViewController.childViewControllerForScreenEdgesDeferringSystemGestures),
-            #selector(getter: UIViewController.crate_childViewControllerForScreenEdgesDeferringSystemGestures),
+            #selector(getter: UIViewController.childForScreenEdgesDeferringSystemGestures),
+            #selector(getter: UIViewController.crate_childForScreenEdgesDeferringSystemGestures),
             on: UIViewController.self
         )
         if #available(iOS 26.0, *) {
