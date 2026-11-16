@@ -557,8 +557,6 @@ private final class PointerLockOverlayController: UIViewController {
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
         isCaptured ? .all : []
     }
-    @available(iOS 27.0, *)
-    override var prefersDirectTouchSystemGesturesDisabled: Bool { isCaptured }
     override var prefersHomeIndicatorAutoHidden: Bool { isCaptured }
     override var canBecomeFirstResponder: Bool { isCaptured }
 
@@ -612,9 +610,6 @@ private final class PointerLockOverlayController: UIViewController {
 
         setNeedsUpdateOfHomeIndicatorAutoHidden()
         setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
-        if #available(iOS 27.0, *) {
-            setNeedsUpdateOfDirectTouchSystemGesturesDisabled()
-        }
         if #available(iOS 26.0, *) {
             setNeedsUpdateOfPrefersPointerLocked()
         }
