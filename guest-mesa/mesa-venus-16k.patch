@@ -13,7 +13,7 @@ VkMemoryAllocateInfo.
 diff --git a/src/virtio/vulkan/vn_device_memory.c b/src/virtio/vulkan/vn_device_memory.c
 --- a/src/virtio/vulkan/vn_device_memory.c
 +++ b/src/virtio/vulkan/vn_device_memory.c
-@@ -31,12 +31,15 @@ vn_device_memory_alloc_simple(struct vn_device *dev,
+@@ -31,11 +31,14 @@ vn_device_memory_alloc_simple(struct vn_device *dev,
  {
     VkDevice dev_handle = vn_device_to_handle(dev);
     VkDeviceMemory mem_handle = vn_device_memory_to_handle(mem);
