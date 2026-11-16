@@ -65,6 +65,7 @@ build() {
     -Dgallium-drivers= \
     -Dvulkan-drivers=virtio \
     -Dvulkan-layers= \
+    -Dvulkan-manifest-per-architecture=false \
     -Dopengl=false \
     -Dgles1=disabled \
     -Dgles2=disabled \
