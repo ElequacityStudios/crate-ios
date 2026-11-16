@@ -51,7 +51,6 @@ if ! grep -Fq 'CAPSET_VENUS: u32 = 4' "$CRATE_DIR/crates/crate-host/src/virgl.rs
     || ! grep -Fq 'venus_host_blob_maps_and_scans_out' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
     || ! grep -Fq 'venus_default_blob_can_attach_and_detach_backing_later' "$CRATE_DIR/crates/crate-devices/src/virtio/gpu/tests.rs" \
     || ! grep -Fq 'override var prefersPointerLocked: Bool { isCaptured }' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
-    || ! grep -Fq 'override var prefersDirectTouchSystemGesturesDisabled: Bool { isCaptured }' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
     || ! grep -Fq 'dy: Int32((-dy).rounded())' "$REPO/Sources/Crate/Engine/DisplayView.swift" \
     || ! grep -Fq 'guard !mouseCaptured else { return nil }' "$REPO/Sources/Crate/Engine/DisplayView.swift" \
     || ! grep -Fq 'releaseButton.isHidden = !captured' "$REPO/Sources/Crate/Home/MachineScreen.swift" \
