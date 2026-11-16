@@ -8,6 +8,7 @@ import UIKit
 private var crateHomeIndicatorChildKey: UInt8 = 0
 private var cratePointerLockChildKey: UInt8 = 0
 private var crateSystemGesturesChildKey: UInt8 = 0
+private var crateDirectTouchSystemGesturesChildKey: UInt8 = 0
 private var crateIgnoreIndirectPointerKey: UInt8 = 0
 
 /// SwiftUI doesn't forward UIKit's home-indicator and pointer-lock preferences
@@ -26,6 +27,13 @@ enum CrateUIKitPatches {
             #selector(getter: UIViewController.crate_childForScreenEdgesDeferringSystemGestures),
             on: UIViewController.self
         )
+        if #available(iOS 27.0, *) {
+            exchange(
+                #selector(getter: UIViewController.childForDirectTouchSystemGesturesDisabled),
+                #selector(getter: UIViewController.crate_childForDirectTouchSystemGesturesDisabled),
+                on: UIViewController.self
+            )
+        }
         if #available(iOS 26.0, *) {
             exchange(
                 #selector(getter: UIViewController.childViewControllerForPointerLock),
@@ -64,12 +72,26 @@ extension UIViewController {
         objc_getAssociatedObject(self, &cratePointerLockChildKey) as? UIViewController
     }
 
+    @available(iOS 27.0, *)
+    @objc fileprivate dynamic var crate_childForDirectTouchSystemGesturesDisabled: UIViewController? {
+        objc_getAssociatedObject(self, &crateDirectTouchSystemGesturesChildKey) as? UIViewController
+    }
+
     func crate_setPointerLockPreferencesChild(_ child: UIViewController?) {
         _ = CrateUIKitPatches.install
         objc_setAssociatedObject(self, &crateHomeIndicatorChildKey, child, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         objc_setAssociatedObject(self, &crateSystemGesturesChildKey, child, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         setNeedsUpdateOfHomeIndicatorAutoHidden()
         setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+        if #available(iOS 27.0, *) {
+            objc_setAssociatedObject(
+                self,
+                &crateDirectTouchSystemGesturesChildKey,
+                child,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+            )
+            setNeedsUpdateOfDirectTouchSystemGesturesDisabled()
+        }
         if #available(iOS 26.0, *) {
             objc_setAssociatedObject(self, &cratePointerLockChildKey, child, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
             setNeedsUpdateOfPrefersPointerLocked()
