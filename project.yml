@@ -107,8 +107,8 @@ targets:
           NAMES="MoltenVK EGL GLESv2 epoxy virglrenderer.1 virglrenderer.venus"
           for name in $NAMES; do
             [ -d "$SRC/$name.framework" ] || {
-              echo "warning: no $name.framework, so VMs get a 2D display: run Scripts/build-moltenvk.sh, build-angle.sh and build-virgl.sh"
-              exit 0
+              echo "error: required GPU framework $name.framework is missing; refusing to ship a 2D-only IPA" >&2
+              exit 1
             }
           done
           DEST="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"

@@ -584,6 +584,22 @@ struct DisplayView: UIViewRepresentable {
                                       buttons: self.mouseButtons)
                 }
             }
+            // GameController delivers wheel and trackpad scrolling independently
+            // of UIKit's pointer gesture recognizers. Keep fractional deltas so
+            // high-resolution wheels and trackpads don't lose small movements.
+            input.scroll.valueChangedHandler = { [weak self] _, x, y in
+                DispatchQueue.main.async {
+                    guard let self, self.mouseCaptured else { return }
+                    self.scrollCarry.x += CGFloat(x)
+                    self.scrollCarry.y += CGFloat(y)
+                    let dx = Int32(-self.scrollCarry.x)
+                    let dy = Int32(-self.scrollCarry.y)
+                    guard dx != 0 || dy != 0 else { return }
+                    self.scrollCarry.x += CGFloat(dx)
+                    self.scrollCarry.y += CGFloat(dy)
+                    self.bridge.scroll(dx: dx, dy: dy)
+                }
+            }
             input.leftButton.valueChangedHandler = { [weak self] _, _, down in
                 DispatchQueue.main.async { self?.setMouseButton(1, down: down) }
             }
@@ -611,6 +627,7 @@ struct DisplayView: UIViewRepresentable {
             // Do not forward the button press that initiated capture; only
             // subsequent physical button events belong to the guest.
             mouseButtons = 0
+            scrollCarry = .zero
             bridge.mouse(dx: 0, dy: 0, buttons: 0)
             var style = captureButton.configuration ?? .filled()
             style.title = captured ? "Release mouse" : "Capture mouse"

@@ -51,10 +51,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERIFY_ATTESTATION: 1
         run: |
-          # Mouse/input-only build: keep the attested GPU framework bundle
-          # pinned as-is. Vulkan renderer work is paused until capture is fixed.
+          # Fetch the pinned ANGLE/MoltenVK/OpenGL stack, then build the
+          # Venus-enabled virglrenderer and libepoxy against the iOS SDK.
           Scripts/fetch-frameworks.sh
           Scripts/fetch-stikjit.sh
+          bash Scripts/build-virgl-venus.sh
           CRATE_DIR="$GITHUB_WORKSPACE/crate" Scripts/build-crate.sh
       - name: Build
         run: |
