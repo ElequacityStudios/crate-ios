@@ -575,7 +575,7 @@ struct DisplayView: UIViewRepresentable {
             input.mouseMovedHandler = { [weak self] _, dx, dy in
                 DispatchQueue.main.async {
                     guard let self, self.mouseCaptured else { return }
-                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: Int32(dy.rounded()),
+                    self.bridge.mouse(dx: Int32(dx.rounded()), dy: Int32((-dy).rounded()),
                                       buttons: self.mouseButtons)
                 }
             }
@@ -627,9 +627,11 @@ struct DisplayView: UIViewRepresentable {
         /// one; over the bars beside it, as anywhere else.
         func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest,
                                 defaultRegion: UIPointerRegion) -> UIPointerRegion? {
-            // While captured, hide the system pointer anywhere in this view,
-            // not just over the guest's letterboxed picture.
-            let rect = mouseCaptured ? bounds : pointerArea
+            // UTM's pointer-lock path withdraws the pointer region entirely
+            // while locked. The system owns the pointer then, not UIKit's
+            // hover-region machinery.
+            guard !mouseCaptured else { return nil }
+            let rect = pointerArea
             return rect.contains(request.location) ? UIPointerRegion(rect: rect) : nil
         }
 
