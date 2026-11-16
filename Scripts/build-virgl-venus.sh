@@ -78,9 +78,9 @@ git -C "$STEAMAC_DIR" checkout -q --detach FETCH_HEAD
 # snapshot; keep the merge so every patch applies to its intended source ABI.
 git init -q "$WORK/virglrenderer"
 git -C "$WORK/virglrenderer" remote add origin https://github.com/utmapp/virglrenderer.git
-git -C "$WORK/virglrenderer" fetch -q --depth=1 origin "$UTM_COMMIT"
+git -C "$WORK/virglrenderer" fetch -q origin "$UTM_COMMIT"
 git -C "$WORK/virglrenderer" remote add upstream https://gitlab.freedesktop.org/virgl/virglrenderer.git
-git -C "$WORK/virglrenderer" fetch -q --depth=1 upstream "$UPSTREAM_COMMIT"
+git -C "$WORK/virglrenderer" fetch -q upstream "$UPSTREAM_COMMIT"
 git -C "$WORK/virglrenderer" checkout -q -f --detach "$UTM_COMMIT"
 git -C "$WORK/virglrenderer" clean -q -fdx
 export GIT_AUTHOR_NAME=crate-builder GIT_AUTHOR_EMAIL=crate-builder@local
