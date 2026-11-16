@@ -32,7 +32,7 @@ jobs:
 
       - name: Install a current Meson
         run: |
-          python3 -m venv "$RUNNER_TEMP/meson"
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/meson"
           "$RUNNER_TEMP/meson/bin/pip" install "meson>=1.4.0"
           echo "$RUNNER_TEMP/meson/bin" >> "$GITHUB_PATH"
 
