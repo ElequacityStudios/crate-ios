@@ -22,13 +22,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential curl meson ninja-build pkg-config zstd \
-            python3-mako python3-packaging python3-ply python3-pycparser \
+            python3-mako python3-packaging python3-ply python3-pycparser python3-venv \
             libdrm-dev libdisplay-info-dev libelf-dev libexpat1-dev \
             libx11-dev libxcb1-dev libxshmfence-dev libsystemd-dev \
             libwayland-dev wayland-protocols libxcb-keysyms1-dev libzstd-dev libxml2-dev \
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-present-dev \
             libxcb-dri3-dev libxcb-sync-dev libx11-xcb-dev libxrandr-dev libxfixes-dev libxext-dev \
             zlib1g-dev libvulkan-dev glslang-dev spirv-tools
+
+      - name: Install a current Meson
+        run: |
+          python3 -m venv "$RUNNER_TEMP/meson"
+          "$RUNNER_TEMP/meson/bin/pip" install "meson>=1.4.0"
+          echo "$RUNNER_TEMP/meson/bin" >> "$GITHUB_PATH"
 
       - name: Download and patch Mesa
         run: |
