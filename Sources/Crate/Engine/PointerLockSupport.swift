@@ -51,16 +51,16 @@ enum CrateUIKitPatches {
 }
 
 extension UIViewController {
-    @objc private dynamic var crate_childForHomeIndicatorAutoHidden: UIViewController? {
+    @objc fileprivate dynamic var crate_childForHomeIndicatorAutoHidden: UIViewController? {
         objc_getAssociatedObject(self, &crateHomeIndicatorChildKey) as? UIViewController
     }
 
-    @objc private dynamic var crate_childViewControllerForScreenEdgesDeferringSystemGestures: UIViewController? {
+    @objc fileprivate dynamic var crate_childViewControllerForScreenEdgesDeferringSystemGestures: UIViewController? {
         objc_getAssociatedObject(self, &crateSystemGesturesChildKey) as? UIViewController
     }
 
     @available(iOS 26.0, *)
-    @objc private dynamic var crate_childViewControllerForPointerLock: UIViewController? {
+    @objc fileprivate dynamic var crate_childViewControllerForPointerLock: UIViewController? {
         objc_getAssociatedObject(self, &cratePointerLockChildKey) as? UIViewController
     }
 
