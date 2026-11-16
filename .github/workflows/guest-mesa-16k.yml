@@ -1,0 +1,106 @@
+name: Build patched guest Venus ICD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "guest-mesa/**"
+      - ".github/workflows/guest-mesa-16k.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential curl meson ninja-build pkg-config \
+            python3-mako python3-packaging python3-ply python3-pycparser \
+            libdrm-dev libdisplay-info-dev libelf-dev libexpat1-dev \
+            libx11-dev libxcb1-dev libxshmfence-dev libsystemd-dev \
+            libwayland-dev libxcb-keysyms1-dev libzstd-dev libxml2-dev \
+            zlib1g-dev libvulkan-dev glslang-dev spirv-tools
+
+      - name: Download and patch Mesa
+        run: |
+          curl -fL https://archive.mesa3d.org/mesa-26.2.7.tar.xz -o mesa.tar.xz
+          tar -xf mesa.tar.xz
+          cd mesa-26.2.7
+          patch -Np1 -i "$GITHUB_WORKSPACE/guest-mesa/mesa-venus-16k.patch"
+
+      - name: Build only the Venus Vulkan ICD
+        run: |
+          cd mesa-26.2.7
+          meson setup build \
+            --prefix=/usr \
+            --libdir=lib \
+            --buildtype=release \
+            -Dplatforms=wayland,x11 \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=virtio \
+            -Dvulkan-layers= \
+            -Dopengl=false \
+            -Dgles1=disabled \
+            -Dgles2=disabled \
+            -Dglx=disabled \
+            -Degl=disabled \
+            -Dgbm=disabled \
+            -Dllvm=disabled \
+            -Dbuild-tests=false \
+            -Dvalgrind=disabled
+          meson compile -C build
+          DESTDIR="$GITHUB_WORKSPACE/stage" meson install -C build --no-rebuild
+
+      - name: Package AArch64 ICD
+        run: |
+          set -euo pipefail
+          test -f stage/usr/lib/libvulkan_virtio.so
+          test -f stage/usr/share/vulkan/icd.d/virtio_icd.json
+          mkdir -p package/usr/lib package/usr/share/vulkan/icd.d package/usr/share/licenses/vulkan-virtio
+          install -m755 stage/usr/lib/libvulkan_virtio.so package/usr/lib/
+          install -m644 stage/usr/share/vulkan/icd.d/virtio_icd.json package/usr/share/vulkan/icd.d/
+          install -m644 mesa-26.2.7/docs/license.rst package/usr/share/licenses/vulkan-virtio/LICENSE
+          cat > package/.PKGINFO <<'EOF'
+          pkgname = vulkan-virtio
+          pkgbase = vulkan-virtio
+          pkgver = 1:26.2.7-2
+          pkgdesc = Mesa Venus Vulkan ICD with 16 KiB Apple Silicon blob alignment
+          url = https://www.mesa3d.org/
+          builddate = 1794852000
+          packager = Elequacity Studios
+          size = 0
+          arch = aarch64
+          license = MIT
+          depend = expat
+          depend = glibc
+          depend = libdisplay-info
+          depend = libdrm
+          depend = libgcc
+          depend = libstdc++
+          depend = libx11
+          depend = libxcb
+          depend = libxshmfence
+          depend = systemd-libs
+          depend = vulkan-icd-loader
+          depend = wayland
+          depend = xcb-util-keysyms
+          depend = zlib
+          depend = zstd
+          EOF
+          size=$(du -sb package/usr | cut -f1)
+          sed -i "s/^size = 0$/size = $size/" package/.PKGINFO
+          tar --zstd -cf vulkan-virtio-26.2.7-2-aarch64.pkg.tar.zst -C package .PKGINFO usr
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vulkan-virtio-16k-aarch64
+          path: vulkan-virtio-26.2.7-2-aarch64.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 90
