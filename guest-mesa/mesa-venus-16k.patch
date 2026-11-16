@@ -1,73 +1,61 @@
 From 761ef1ec5ff2aae1cc3dc8bbc22b3d06ef04b549 Mon Sep 17 00:00:00 2001
 Subject: [PATCH] virtio/vulkan: force 16 KiB alignment for Apple Silicon
 
-The iOS/macOS host maps Venus host-visible blobs using a 16 KiB VM page
-granule. A 4 KiB guest can otherwise submit ring and device-memory sizes
-that the host cannot map. Align every allocation path used by Venus.
+The host VM page granule is 16 KiB. Round every Venus ring, shared-memory,
+and device-memory allocation up to that granule so the guest kernel never
+places a Venus host-visible blob at an incompatible boundary.
 
-This is the Apple Silicon workaround from slp/mesa commit
-761ef1ec5ff2aae1cc3dc8bbc22b3d06ef04b549, with the allocation-info
-copy kept local instead of modifying a const caller-owned structure.
+This is based on slp/mesa commit 761ef1ec5ff2aae1cc3dc8bbc22b3d06ef04b549.
+The device-memory allocation-info copy avoids modifying a const caller-owned
+VkMemoryAllocateInfo.
 
 ---
- src/virtio/vulkan/vn_device_memory.c    | 7 +++++--
- src/virtio/vulkan/vn_renderer_virtgpu.c | 4 ++++
- src/virtio/vulkan/vn_ring.c             | 2 +-
- 3 files changed, 10 insertions(+), 3 deletions(-)
-
 diff --git a/src/virtio/vulkan/vn_device_memory.c b/src/virtio/vulkan/vn_device_memory.c
-index 7aec50aad19..5c86130522e 100644
 --- a/src/virtio/vulkan/vn_device_memory.c
 +++ b/src/virtio/vulkan/vn_device_memory.c
-@@ -31,12 +31,15 @@ vn_device_memory_alloc_simple(struct vn_device *dev,
+@@ -32,10 +32,13 @@ vn_device_memory_alloc_simple(struct vn_device *dev,
  {
     VkDevice dev_handle = vn_device_to_handle(dev);
     VkDeviceMemory mem_handle = vn_device_memory_to_handle(mem);
 +   VkMemoryAllocateInfo aligned_alloc_info = *alloc_info;
 +   aligned_alloc_info.allocationSize =
 +      align64(alloc_info->allocationSize, 16384);
- 
     if (VN_PERF(NO_ASYNC_MEM_ALLOC)) {
        return vn_call_vkAllocateMemory(dev->primary_ring, dev_handle,
 -                                      alloc_info, NULL, &mem_handle);
 +                                      &aligned_alloc_info, NULL, &mem_handle);
     }
- 
+
     struct vn_ring_submit_command ring_submit;
 -   vn_submit_vkAllocateMemory(dev->primary_ring, 0, dev_handle, alloc_info,
 +   vn_submit_vkAllocateMemory(dev->primary_ring, 0, dev_handle, &aligned_alloc_info,
                                NULL, &mem_handle, &ring_submit);
 diff --git a/src/virtio/vulkan/vn_renderer_virtgpu.c b/src/virtio/vulkan/vn_renderer_virtgpu.c
-index e9316fbe6ef..b5701970964 100644
 --- a/src/virtio/vulkan/vn_renderer_virtgpu.c
 +++ b/src/virtio/vulkan/vn_renderer_virtgpu.c
-@@ -650,6 +650,8 @@ virtgpu_bo_create_from_device_memory(
+@@ -654,4 +654,6 @@ virtgpu_bo_create_from_device_memory(
     const uint32_t blob_flags =
        virtgpu_bo_blob_flags(gpu, flags, external_handles);
- 
+
 +   size = align64(size, 16384);
 +
     uint32_t res_id;
     uint32_t gem_handle = virtgpu_ioctl_resource_create_blob(
-       gpu, batch, gpu->bo_blob_mem, blob_flags, size, mem_id, &res_id);
-@@ -736,6 +738,8 @@ virtgpu_shmem_create(struct vn_renderer *renderer, size_t size)
+@@ -742,4 +744,6 @@ virtgpu_shmem_create(struct vn_renderer *renderer, size_t size)
  {
     struct virtgpu *gpu = (struct virtgpu *)renderer;
- 
+
 +   size = align64(size, 16384);
 +
     struct vn_renderer_shmem *cached_shmem =
        vn_renderer_shmem_cache_get(&gpu->shmem_cache, size);
 diff --git a/src/virtio/vulkan/vn_ring.c b/src/virtio/vulkan/vn_ring.c
-index 8782cb1836e..2241389c7ab 100644
 --- a/src/virtio/vulkan/vn_ring.c
 +++ b/src/virtio/vulkan/vn_ring.c
-@@ -264,7 +264,7 @@ vn_ring_get_layout(size_t buf_size,
+@@ -264,3 +264,3 @@ vn_ring_get_layout(size_t buf_size,
     layout->extra_offset = layout->buffer_offset + layout->buffer_size;
     layout->extra_size = extra_size;
- 
 -   layout->shmem_size = layout->extra_offset + layout->extra_size;
 +   layout->shmem_size = align64(layout->extra_offset + layout->extra_size, 16384);
- }
--- 
+--
 2.47.0
